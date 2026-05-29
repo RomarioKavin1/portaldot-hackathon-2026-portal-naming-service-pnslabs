@@ -4,30 +4,39 @@
 # ("lib.rmeta not a mach-o file"), so a native arm64 build is impossible. Linux GNU ld
 # does not do that validation, so the 2021 toolchain builds cleanly here.
 #
+# Why a MODERN base (bookworm) + rustup (not rust:1.52-buster): Debian buster is EOL and
+# its apt repos are gone (apt-get update fails). bookworm gives working apt + a current
+# binaryen; the old nightly toolchain runs fine on modern glibc and links via GNU ld.
+#
 # Verified target (see docs/toolchain.md): Substrate/pallet-contracts 3.0.0, seal0 ABI,
 # Rust nightly-2021-03-01, ink! 3.0.0-rc, cargo-contract ~0.12, metadata v0.
 #
-# Run x86_64 under emulation on Apple Silicon (the contemporaneous, best-supported arch):
+# Build (x86_64 under emulation on Apple Silicon — the contemporaneous, best-supported arch):
 #   docker build --platform=linux/amd64 -f docker/Dockerfile.contracts -t pns-ink-build .
 #   docker run --rm --platform=linux/amd64 -v "$PWD":/work pns-ink-build \
 #     bash -lc "cd contracts/flipper && cargo +nightly-2021-03-01 contract build"
 
-FROM --platform=linux/amd64 rust:1.52.0-buster
+FROM --platform=linux/amd64 debian:bookworm-slim
 
 ARG NIGHTLY=nightly-2021-03-01
 ARG CARGO_CONTRACT_VERSION=0.12.1
+ENV RUSTUP_HOME=/root/.rustup \
+    CARGO_HOME=/root/.cargo \
+    PATH=/root/.cargo/bin:$PATH
 
-# binaryen provides wasm-opt (invoked by cargo-contract); plus build deps.
+# Toolchain build deps + binaryen (provides wasm-opt, invoked by cargo-contract).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends binaryen clang pkg-config libssl-dev \
+ && apt-get install -y --no-install-recommends \
+      curl ca-certificates build-essential clang pkg-config libssl-dev binaryen git \
  && rm -rf /var/lib/apt/lists/*
 
-# Old nightly for the wasm contract build (rust-src + wasm target required by ink!).
-RUN rustup toolchain install ${NIGHTLY} \
+# Old nightly via rustup (rust-src + wasm target required by ink! 3.0-rc).
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+      | sh -s -- -y --default-toolchain ${NIGHTLY} --profile minimal \
  && rustup component add rust-src --toolchain ${NIGHTLY} \
  && rustup target add wasm32-unknown-unknown --toolchain ${NIGHTLY}
 
-# cargo-contract tool (built with the image's stable 1.52; --locked pins 2021 deps).
+# cargo-contract tool, built with the old nightly (--locked pins its 2021 deps).
 RUN cargo install cargo-contract --version ${CARGO_CONTRACT_VERSION} --locked
 
 WORKDIR /work

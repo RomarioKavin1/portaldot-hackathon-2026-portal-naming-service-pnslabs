@@ -1,0 +1,44 @@
+[package]
+name = "flipper"
+version = "0.1.0"
+authors = ["[your_name] <[your_email]>"]
+edition = "2018"
+
+[dependencies]
+# Pinned EXACTLY to rc3: caret requirements float to ink 3.4.0 which needs edition2021
+# (unsupported by rustc 1.52 / nightly-2021-03-01). See docs/toolchain.md.
+ink_primitives = { version = "=3.0.0-rc3", default-features = false }
+ink_metadata = { version = "=3.0.0-rc3", default-features = false, features = ["derive"], optional = true }
+ink_env = { version = "=3.0.0-rc3", default-features = false }
+ink_storage = { version = "=3.0.0-rc3", default-features = false }
+ink_lang = { version = "=3.0.0-rc3", default-features = false }
+# Transitive ink crates pinned to stop them floating to 3.4.0 too:
+ink_prelude = { version = "=3.0.0-rc3", default-features = false }
+ink_allocator = { version = "=3.0.0-rc3", default-features = false }
+# Non-ink transitives whose newer releases require edition2021 (rustc 1.52 can't build):
+impl-trait-for-tuples = "=0.2.1"
+
+scale = { package = "parity-scale-codec", version = "2.1", default-features = false, features = ["derive"] }
+scale-info = { version = "0.6.0", default-features = false, features = ["derive"], optional = true }
+
+[lib]
+name = "flipper"
+path = "lib.rs"
+crate-type = [
+	# Used for normal contract Wasm blobs.
+	"cdylib",
+]
+
+[features]
+default = ["std"]
+std = [
+    "ink_metadata/std",
+    "ink_env/std",
+    "ink_storage/std",
+    "ink_primitives/std",
+    "scale/std",
+    "scale-info/std",
+]
+ink-as-dependency = []
+
+[workspace]

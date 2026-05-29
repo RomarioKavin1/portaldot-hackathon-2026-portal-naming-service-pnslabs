@@ -3,6 +3,10 @@ target/
 **/target/
 Cargo.lock
 
+# Vendored deps + generated source-replacement config (from toolchain build attempts)
+**/vendor/
+**/.cargo/config.toml
+
 # Node
 node_modules/
 .next/
