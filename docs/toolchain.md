@@ -48,6 +48,17 @@ reading that repo on 2026-05-30:
 | 7 | Non-resetting testnet | Node runs in `--dev` (state resets on restart); mainnet `wss://mainnet.portaldot.io` persists |
 | 8 | Faucet | `//Alice` drip (Sudo+faucet master); PortalFlow app API (see `rpc.md`) |
 
+## Build-environment finding (2026-05-30) — native macOS build is BLOCKED
+- `nightly-2021-03-01` (rustc 1.52) installs fine on arm64, but **cannot link on this
+  machine**: Xcode 26.1.1 / `ld-1230` rejects the toolchain's 2021 `.rlib` archives with
+  `archive member 'lib.rmeta' ... is not mach-o or llvm bitcode file`. Even a trivial
+  hello-world fails; `-ld_classic` is now a thin alias on `ld-1230` and still errors.
+- Therefore `cargo install cargo-contract 0.12.1` fails at link time (`crc32fast`, build
+  scripts, etc.). Confirmed empirically.
+- **Conclusion: build contracts on Linux (Docker)** where GNU `ld` doesn't perform this
+  mach-o member validation. Native macOS would require an alternative linker (Homebrew
+  `lld`/`ld64.lld`) and is unverified.
+
 ## Verified recipe (fill after Phase 0 build passes)
 - Build command:
 - Deploy command:
