@@ -23,6 +23,19 @@ reading that repo on 2026-05-30:
 - Built by "fengsong"; node crate `node-cli 2.0.0`.
 - Confirms: rent-era `instantiate_with_code`, no `upload_code`/storage-deposits/Weight V2.
 
+### Corroboration from the first-party Python SDK (`DeveloperPlatform/sdk_interface/contracts.py`)
+- Parses **metadata version 0** (the top-level `metadataVersion` key) — the format **ink!
+  3.0.0-rc** emitted in early 2021. Docstring references `cargo +nightly contract
+  generate-metadata` (an old cargo-contract subcommand). → contract side = ink! 3.0.0-rc +
+  cargo-contract ~0.11–0.12.
+- ⚠️ The **readthedocs examples are written for a NEWER runtime** than the live node: they
+  use Weight-V2 gas (`gas_limit={'ref_time':…, 'proof_size':…}`) and
+  `type_registry_preset='default'`. For THIS node use **old single-integer u64
+  `gas_limit`** (e.g. `1_000_000_000_000`) and preset `substrate-node-template`.
+- Deploy path confirmed: `substrate-interface` `ContractCode.create_from_contract_files()`
+  → `code.deploy(constructor="new", args=..., gas_limit=<u64>, upload_code=True)`.
+- No prebuilt flipper artifact exists in any Portaldot repo (no build-free shortcut).
+
 ## Questions → Answers
 | # | Question | Answer (✅ = verified) |
 |---|----------|------------------------|
