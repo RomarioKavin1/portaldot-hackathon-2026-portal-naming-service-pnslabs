@@ -1,8 +1,8 @@
 # Portal Naming Service — Design Spec
 
-**Date:** 2026-05-30
+**Date:** 2026-05-30 (updated same day with live-node probe results)
 **Status:** Approved design, pre-implementation
-**Target chain:** Portaldot (Substrate / Polkadot-SDK standalone L1, ink!/`pallet-contracts`, non-EVM)
+**Target chain:** Portaldot — Substrate/Polkadot-SDK standalone L1, **old (~2021-era, metadata V13) `pallet-contracts` → ink! ~3.x**, non-EVM. Verified identical on mainnet and dev node (spec 1002).
 **Namespace:** `.pot`
 
 ---
@@ -37,25 +37,60 @@ demoable slice (the v1 scope below) can be presented for the Portaldot Mini Hack
 
 ---
 
-## 2. Platform Constraints (from Portaldot dev docs)
+## 2. Platform Constraints (VERIFIED against live nodes, 2026-05-30)
 
-Confirmed from `https://portaldot-dev.readthedocs.io/en/latest/`:
+> **Important:** the official docs (`https://portaldot-dev.readthedocs.io/en/latest/`)
+> describe a *modern* `pallet-contracts` (storage deposits, `maxTransientStorageSize`,
+> `apiVersion`, Weight V2). **This is inaccurate.** Direct WebSocket probes of both the
+> dev node and mainnet show an **old, ~2021-era runtime**. Build for the verified
+> reality below, not the docs.
+
+### Verified runtime (mainnet + dev node are byte-identical)
+Probed `wss://mainnet.portaldot.io` and `wss://portaldot.philotheephilix.in`:
 
 - **Substrate/Polkadot-SDK standalone L1** (BABE + GRANDPA + NPoS). Not a parachain.
-- **Smart contracts via `pallet-contracts` → ink! (Rust/Wasm).** No Solidity/EVM.
-- **POT token, 14 decimals.** Gas = weight fees **+ storage deposits per byte/item**.
+- `specName=portaldot`, `specVersion=1002`, node `2.0.0-unknown`, **metadata V13**
+  (pre-dates the V14 switch of ~Sept 2021). Mainnet and dev node return the **same
+  153,205-byte metadata** — identical runtime.
+- **`Contracts` pallet present** (`contracts_call`, `contracts_instantiate`,
+  `contracts_getStorage` RPCs) → ink! contracts ARE deployable. **Not EVM** (no
+  `Ethereum`/`EVM`/`Revive` pallets).
+- **Old pallet-contracts (~2021 / ink! ~3.0-rc / 2.x era):**
+  - **No storage deposits** (`storage_deposit`, `depositPerByte`, `OwnerInfoOf` all
+    absent). Fees are **old `u64` Weight** only (no Weight V2).
+  - **No code/instance separation** (`upload_code` absent) → deploy via
+    **`instantiate_with_code`** only; cannot pre-upload a code hash the modern way.
+  - Classic storage items present: `ContractInfoOf`, `CodeStorage`, `PristineCode`,
+    `DeletionQueue`.
+- **POT token, 14 decimals** (1 POT = 10^14 planck). **ExistentialDeposit = 1 POT.**
 - **SS58 accounts (prefix 42)**, sr25519/ed25519. No 0x/EVM addresses.
-- Native **`pallet-identity` with usernames** exists (authority-gated) — we integrate
-  **read-only** for verification badges; we do NOT depend on being a username authority.
-- Useful native pallets available: `scheduler`, `proxy`, `multisig`, `assets`.
-- First-party **Python SDK** is the documented tool; `cargo-contract` / polkadot.js are
-  the standard ink! toolchain (inferred — confirm versions against a live node).
+- **`pallet-identity` is the CLASSIC version** (identity, judgements, subs) —
+  **no native usernames** (`set_username_for` absent). We integrate **read-only** with
+  registrar **judgements** for verification badges; no authority role needed.
+- Other native pallets present: `balances`, `assets`, `staking`, `scheduler`, `proxy`,
+  `multisig`.
 
-### Environment risk (must resolve before public deploy)
-Portaldot docs publish **no public testnet RPC endpoint or POT faucet**. Plan:
-develop against a local `portaldot_dev --dev` node (or `substrate-contracts-node` for
-fast iteration); confirm a real testnet endpoint + faucet and the exact ink!/
-cargo-contract versions with the Portaldot team before any public deployment.
+### Toolchain implications (binding constraints)
+- Target **old ink! (~3.0-rc / 2.x)** + a matching **old `cargo-contract`** + old
+  contract-metadata format. Modern ink! 5.x / cargo-contract WILL NOT deploy here.
+- **PSP-34 is unavailable** (needs ink! 4.x+ / OpenBrush) — use a custom in-contract
+  ownership map instead (see §4).
+- Metadata is **pre-V14**, so `@polkadot/api` / `substrate-interface` need legacy type
+  handling. Python `substrate-interface` requires
+  `type_registry_preset='substrate-node-template'` + `ss58_format=42` (verified).
+- ⚠️ **Build risk:** compiling ~2021-era ink! in 2026 needs an old Rust nightly + old
+  wasm target + old `cargo-contract`. **First implementation task = pin & verify the
+  exact ink!/cargo-contract version by deploying one trivial contract to the dev node**
+  before building anything else (see §10, §12).
+
+### Environment & faucet (verified — see `rpc.md` in repo root)
+- **Endpoints:** mainnet `wss://mainnet.portaldot.io`; dev node public
+  `wss://portaldot.philotheephilix.in`, local `ws://127.0.0.1:9944`.
+- **Faucet (dev node):** `//Alice` is pre-funded + Sudo + faucet master; drip via a
+  direct `Balances.transfer` (≥1 POT to clear ExistentialDeposit), or via the PortalFlow
+  app API.
+- ⚠️ **Dev node wipes all state on every restart** — deployed contracts and
+  registrations do not persist. A redeploy/seed script is required for dev/demo.
 
 ---
 
@@ -71,9 +106,10 @@ Registry  (source of truth — minimal, rarely changes)
   setOwner · setResolver · setSubnodeOwner · owner() · resolver()
      ▲ owns ".pot" node                 ▲ each node points to a resolver
      │                                   │
-PotRegistrar (.pot)               PublicResolver (upgradeable via set_code_hash)
+PotRegistrar (.pot)               PublicResolver
   • owns the .pot node              addr(node, coinType) · text(node, key)
-  • names = PSP-34 NFTs             payment(node) · profile(node) · name(node)
+  • names = custom ownership map    payment(node) · profile(node) · name(node)
+    (NFT-style; NOT PSP-34)
   • expiries, grace, auction
   • authorizes Controllers
      ▲ calls
@@ -92,13 +128,16 @@ SubnameRegistrar
 
 - **Registry** — knows only *who owns a node* and *which resolver answers for it*
   (plus TTL). Durability anchor; almost never replaced.
-- **PotRegistrar** — owns the `.pot` node in the Registry; mints each second-level name
-  as a **PSP-34 NFT** (ink!'s ERC-721 equivalent); tracks expiry; runs grace + premium
-  auction. Authorizes one or more Controllers.
+- **PotRegistrar** — owns the `.pot` node in the Registry; records each second-level
+  name's owner in a **custom in-contract ownership map** (NFT-style transfer/approve
+  semantics, but **not PSP-34** — that standard needs ink! 4.x+, unavailable here);
+  tracks expiry; runs grace + premium auction. Authorizes one or more Controllers.
 - **RegistrarController** — public-facing registration policy: commit-reveal, length
   pricing, POT rent collection. Swappable without touching ownership records.
-- **PublicResolver** — upgradeable; holds all records, including the three signature
-  record types and the reverse `name` record.
+- **PublicResolver** — holds all records, including the three signature record types and
+  the reverse `name` record. (Upgradeability: the old runtime lacks modern
+  `set_code_hash` ergonomics, so "upgrade" = deploy a new resolver and re-point names'
+  resolver field in the Registry — the Registry indirection makes this clean.)
 - **ReverseRegistrar** — manages the `addr.reverse` namespace for address→name.
 - **SubnameRegistrar** — programmable subname issuance with permission flags.
 
@@ -119,10 +158,11 @@ node(a.parent)   = blake2_256( node(parent) ‖ labelhash(a) )
 - A name is a UTF-8 string (`alice.pot`). Clients **normalize** first (ENSIP-15-style:
   lowercase, NFC, reject zero-width/confusable/homograph chars) to prevent spoofing.
 - On-chain key is the 32-byte **node** (see hashing above). Fixed-size keys give O(1)
-  lookups at any depth, no on-chain string handling, and small storage footprint
-  (important given per-byte storage deposits).
-- **NFT identity:** in `PotRegistrar`, PSP-34 token id for a second-level name =
-  its `labelhash`. Owning the NFT = owning the registration (the "registrant"). Registry
+  lookups at any depth, no on-chain string handling, and a small storage footprint.
+- **Name ownership (custom, NOT PSP-34):** `PotRegistrar` keeps a
+  `Mapping<labelhash, owner>` plus `transfer` / `approve` methods (ERC-721-like
+  semantics implemented in-contract, since PSP-34 needs ink! 4.x+ which this runtime
+  lacks). Owning that entry = owning the registration (the "registrant"). Registry
   ownership can be delegated to a separate manager/controller account.
 
 ### Records (compact on-chain; large data off-chain via content hash)
@@ -136,7 +176,8 @@ node(a.parent)   = blake2_256( node(parent) ‖ labelhash(a) )
 | `name(node)` | string | reverse resolution |
 
 Large blobs (avatar image, bio document) are stored on IPFS/Arweave; only the content
-hash is stored on-chain, keeping each record write a bounded, cheap storage deposit.
+hash is stored on-chain. (This runtime has no storage-deposit fee, but compact records
+still keep contract state small and reads cheap — good practice regardless.)
 
 ---
 
@@ -149,7 +190,7 @@ hash is stored on-chain, keeping each record write a bounded, cheap storage depo
 2. register(name, owner, duration, secret, resolver?)
         → Controller verifies commitment + availability,
           collects POT rent for `duration`, then PotRegistrar:
-            • mints PSP-34 NFT to owner
+            • records owner in the custom ownership map (NFT-style)
             • sets Registry owner + optional resolver
             • records expiry = now + duration
         → emits NameRegistered
@@ -180,9 +221,10 @@ hash is stored on-chain, keeping each record write a bounded, cheap storage depo
 - **Profile record** + standard `text` socials (`com.twitter`, `com.github`,
   `org.telegram`, `url`, `email`).
 - **Native identity verification (read-only):** SDK/resolver reads Portaldot's native
-  `pallet-identity` for the name owner's account; if it has a registrar **judgement**
-  (`Reasonable`/`KnownGood`), the profile surfaces a **verified** badge. No username
-  authority needed — avoids runtime coupling, scores on "native deployment."
+  `pallet-identity` (classic identity + judgements; this runtime has no usernames) for
+  the name owner's account; if it has a registrar **judgement** (`Reasonable`/
+  `KnownGood`), the profile surfaces a **verified** badge. Pure read integration — no
+  authority role needed — avoids runtime coupling, scores on "native deployment."
 - **Attestations/credentials (v2):** data model + read path designed in v1; third-party
   signed badges attachable to a name; issuance UI deferred.
 - **Reputation (v1 = cheap signals only):** name age + account age + verification,
@@ -264,10 +306,18 @@ re-resolve forward and confirm it maps back to the address` before display.
 
 ## 10. Build, Deployment & Repository
 
-- **`cargo-contract`** builds each contract → Wasm + metadata JSON.
-- Deploy via `@polkadot/api` scripts + polkadot.js Apps "Contracts" UI for manual checks.
-- Develop against local `portaldot_dev --dev` / `substrate-contracts-node`; confirm
-  testnet endpoint + faucet + toolchain versions with Portaldot team before public deploy.
+- **Old `cargo-contract`** (version pinned to the runtime — see §12 item 1) builds each
+  contract → `.wasm` + legacy metadata. Pin the Rust nightly + wasm target in a Docker
+  image / `rust-toolchain.toml` for reproducibility.
+- Deploy via **`instantiate_with_code`** (no `upload_code` on this runtime) using
+  `@polkadot/api` scripts; polkadot.js Apps "Contracts" UI for manual checks. Note the
+  metadata is **V13** — legacy type handling required on the client.
+- Develop against the dev node (`wss://portaldot.philotheephilix.in` or local
+  `portaldot_dev --dev` at `ws://127.0.0.1:9944`); fund via the Alice-drip faucet. Because
+  **dev-node state resets on restart**, a deterministic **redeploy + seed script** is part
+  of the deliverable. Mainnet (`wss://mainnet.portaldot.io`) runs the identical runtime
+  for eventual production deploy.
+- ⚠️ Do not assume modern ink! tooling — verify the exact version FIRST (§12 item 1).
 - **Open source** all core contracts (satisfies hackathon requirement), license TBD by owner.
 
 ```
@@ -287,9 +337,9 @@ portal-name-service/
 ## 11. Scope Summary
 
 **v1 (real foundation, demoable):** all five contracts; commit-reveal registration; annual
-rent + grace + premium auction; PSP-34 name NFTs; full record set; profile + native
-pallet-identity read badge; pay-by-name (POT + assets) with payment requests; subname
-issuance with fuses + paid self-mint; TS SDK + reference dApp.
+rent + grace + premium auction; custom NFT-style name ownership; full record set; profile
++ native pallet-identity read badge; pay-by-name (POT + assets) with payment requests;
+subname issuance with fuses + paid self-mint; TS SDK + reference dApp.
 
 **v2 (deferred):** attestation issuance UI, reputation scoring, streaming payments, open
 subname marketplace, USD-peg price oracle, cross-chain/omnichain resolution.
@@ -298,8 +348,20 @@ subname marketplace, USD-peg price oracle, cross-chain/omnichain resolution.
 
 ## 12. Open Questions / To Confirm
 
-- Public Portaldot **testnet RPC + POT faucet** (not documented).
-- Exact **ink! / cargo-contract versions** supported by the live runtime.
-- Concrete **fee / storage-deposit values** and existential deposit on Portaldot.
-- Whether to peg pricing to USD via an oracle in a later Controller (no documented oracle).
-- License choice for open-sourcing core contracts.
+**Resolved by the 2026-05-30 probes (see §2, `rpc.md`):**
+- ✅ Endpoints + faucet — mainnet `wss://mainnet.portaldot.io`, dev node
+  `wss://portaldot.philotheephilix.in` / `ws://127.0.0.1:9944`, Alice-drip faucet.
+- ✅ Runtime — spec 1002, metadata V13, old pallet-contracts, no storage deposits,
+  ExistentialDeposit 1 POT, classic pallet-identity (no usernames), non-EVM.
+
+**Still open (in priority order):**
+1. **🔴 BLOCKING — exact ink! / cargo-contract / contract-metadata version this old
+   runtime accepts.** Resolve FIRST by deploying one trivial ink! contract to the dev
+   node and iterating versions until `contracts_instantiate` succeeds. Everything else
+   depends on this. (Best signal so far: ink! ~3.0-rc / 2.x, old cargo-contract.)
+2. **Toolchain reproducibility** — pin the old Rust nightly + wasm target + cargo-contract
+   in a Docker image / `rust-toolchain.toml` so the build is reproducible in 2026.
+3. **Dev-node persistence** — state resets on restart; need a deterministic redeploy +
+   seed script, and confirm whether a non-resetting node is available for the demo.
+4. **Pricing** — USD-peg oracle is out (no oracle); confirm POT-denominated tier values.
+5. **License** for open-sourcing core contracts.
