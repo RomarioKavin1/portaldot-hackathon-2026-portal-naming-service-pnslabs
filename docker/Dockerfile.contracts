@@ -1,0 +1,34 @@
+# Linux build environment for Substrate-3.0.0-era ink! contracts targeting Portaldot.
+#
+# Why Docker: the macOS (Xcode 26 / ld-1230) linker rejects 2021 Rust .rlib archives
+# ("lib.rmeta not a mach-o file"), so a native arm64 build is impossible. Linux GNU ld
+# does not do that validation, so the 2021 toolchain builds cleanly here.
+#
+# Verified target (see docs/toolchain.md): Substrate/pallet-contracts 3.0.0, seal0 ABI,
+# Rust nightly-2021-03-01, ink! 3.0.0-rc, cargo-contract ~0.12, metadata v0.
+#
+# Run x86_64 under emulation on Apple Silicon (the contemporaneous, best-supported arch):
+#   docker build --platform=linux/amd64 -f docker/Dockerfile.contracts -t pns-ink-build .
+#   docker run --rm --platform=linux/amd64 -v "$PWD":/work pns-ink-build \
+#     bash -lc "cd contracts/flipper && cargo +nightly-2021-03-01 contract build"
+
+FROM --platform=linux/amd64 rust:1.52.0-buster
+
+ARG NIGHTLY=nightly-2021-03-01
+ARG CARGO_CONTRACT_VERSION=0.12.1
+
+# binaryen provides wasm-opt (invoked by cargo-contract); plus build deps.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends binaryen clang pkg-config libssl-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Old nightly for the wasm contract build (rust-src + wasm target required by ink!).
+RUN rustup toolchain install ${NIGHTLY} \
+ && rustup component add rust-src --toolchain ${NIGHTLY} \
+ && rustup target add wasm32-unknown-unknown --toolchain ${NIGHTLY}
+
+# cargo-contract tool (built with the image's stable 1.52; --locked pins 2021 deps).
+RUN cargo install cargo-contract --version ${CARGO_CONTRACT_VERSION} --locked
+
+WORKDIR /work
+CMD ["bash"]
