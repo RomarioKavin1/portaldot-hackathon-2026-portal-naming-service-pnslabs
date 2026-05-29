@@ -1,0 +1,19 @@
+# Rust
+target/
+**/target/
+Cargo.lock
+
+# Node
+node_modules/
+.next/
+dist/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# ink! build artifacts kept under contracts/*/target are ignored above
+# Local secrets
+.env
+*.local
