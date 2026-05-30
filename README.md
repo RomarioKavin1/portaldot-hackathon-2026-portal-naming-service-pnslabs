@@ -147,7 +147,7 @@ The TypeScript SDK ships network presets and a zero-config `connect()`; pass a c
 
 ### Demo
 
-- **Video link:** _add link before submission_
+- **Video link:** https://canva.link/0737adrur21zuz5
 - **Live demo link:** _optional — deploy `app/` (Vercel or any Node host)_
 - **Test accounts / test data:** Connect any Polkadot.js wallet account; resolve and register `.pot` names directly from the dApp console.
 
