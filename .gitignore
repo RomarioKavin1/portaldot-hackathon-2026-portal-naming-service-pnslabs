@@ -18,6 +18,10 @@ __pycache__/
 *.pyc
 
 # ink! build artifacts kept under contracts/*/target are ignored above
+
+# Per-deploy run state (dev-node resets on restart, so addresses are ephemeral)
+scripts/*_address.txt
+
 # Local secrets
 .env
 *.local
