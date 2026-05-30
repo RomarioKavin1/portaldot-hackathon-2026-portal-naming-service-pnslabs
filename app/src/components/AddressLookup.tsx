@@ -26,7 +26,16 @@ export function AddressLookup() {
       const name = await client.reverse(addr);
       setState(name ? { kind: "ok", address: addr, name } : { kind: "empty", address: addr });
     } catch (e: unknown) {
-      setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      const raw = e instanceof Error ? e.message : String(e);
+      const looksLikeDecodeFail =
+        /^Decoding\s/.test(raw) ||
+        /base58|base-58|checksum|invalid address/i.test(raw);
+      setState({
+        kind: "error",
+        message: looksLikeDecodeFail
+          ? "Not a valid Portaldot address. Paste a 48-character SS58 string starting with 5."
+          : raw,
+      });
     }
   };
 
