@@ -3,7 +3,7 @@
 import { ApiPromise } from "@polkadot/api";
 import { blake2AsU8a, decodeAddress } from "@polkadot/util-crypto";
 import { u8aConcat, hexToU8a } from "@polkadot/util";
-import { buildCallData, defaultSelector, namehash, normalize } from "@portal-name/sdk";
+import { buildCallData, defaultSelector, namehash, normalize } from "portaldot-pns";
 import { signerForAddress } from "./wallet";
 
 const PLANCK = 100_000_000_000_000n; // 1 POT = 10^14

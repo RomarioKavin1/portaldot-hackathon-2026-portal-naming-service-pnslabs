@@ -1,6 +1,6 @@
 "use client";
 
-import { PnsClient } from "@portal-name/sdk";
+import { PnsClient } from "portaldot-pns";
 
 /**
  * Deployed contract addresses for the current target network.
