@@ -1,132 +1,191 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { NameConsole } from "@/components/NameConsole";
-import { AddressLookup } from "@/components/AddressLookup";
-import { YourNames } from "@/components/YourNames";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { SearchConsole } from "@/components/SearchConsole";
+import { YourNames } from "@/components/YourNames";
+import { Btn, CodeBlock, Eyebrow } from "@/components/ui";
+import {
+  CoinDoodle,
+  Dashes,
+  KeyDoodle,
+  NameTag,
+  ScribbleUnderline,
+  SignpostDoodle,
+  SketchDefs,
+  Sparkle,
+  TreeDoodle,
+} from "@/components/doodles";
 
-type Mode = "mint" | "lookup";
+/* Landing — original content ("Own your name on Portaldot.") styled in the
+   pastel/doodle UI system. Mint/Lookup tabs + Your names + feature triad +
+   SDK docs CTA. */
+
+const FEATURES = [
+  {
+    color: "blush" as const,
+    title: "One name, one identity",
+    body: "Map a human handle to an account and records, resolved the same way by every dApp.",
+    Doodle: SignpostDoodle,
+  },
+  {
+    color: "mint" as const,
+    title: "Forward-verified reverse",
+    body: "Address → name only resolves when the name points back. Spoofed records are dropped.",
+    Doodle: KeyDoodle,
+  },
+  {
+    color: "peach" as const,
+    title: "Length-tier pricing",
+    body: "Shorter names cost more, in POT, with annual rent and a grace period before release.",
+    Doodle: TreeDoodle,
+  },
+];
 
 export default function Home() {
-  const [mode, setMode] = useState<Mode>("mint");
-
   return (
-    <div className="flex min-h-screen flex-col">
+    <>
+      <SketchDefs />
       <SiteHeader />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-28 pt-16 sm:pt-24">
-        <header className="text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.22em] text-accent-ink">
-            Portaldot · naming registry
-          </p>
-          <h1 className="mx-auto mt-4 max-w-2xl text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-ink sm:text-6xl">
-            Own your name on Portaldot.
-          </h1>
-          <p className="mx-auto mt-5 max-w-xl text-pretty text-[0.98rem] leading-relaxed text-ink-soft">
-            Mint a <span className="font-mono text-accent-ink">.pot</span> name
-            and point it at your account, your records, your identity, readable
-            across every dApp on the chain.
-          </p>
-        </header>
+      <main style={{ minHeight: "60vh" }} className="view-in">
+        <div className="wrap" style={{ paddingTop: 46, paddingBottom: 10, position: "relative" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1.45fr) minmax(0, 1fr)",
+              gap: 40,
+              alignItems: "center",
+            }}
+          >
+            <div style={{ maxWidth: 720, position: "relative" }}>
+              <div
+                aria-hidden
+                style={{ position: "absolute", left: -10, top: -22 }}
+                className="floaty"
+              >
+                <Sparkle size={28} />
+              </div>
+              <Eyebrow>Portaldot · naming registry</Eyebrow>
+              <h1 className="display" style={{ fontSize: "clamp(52px, 7vw, 94px)", margin: "16px 0 0" }}>
+                Own your{" "}
+                <span className="scribble-u">
+                  name
+                  <ScribbleUnderline />
+                </span>
+                <br />
+                on Portaldot.
+              </h1>
+              <p className="lead" style={{ maxWidth: 540, marginTop: 22 }}>
+                Mint a <span className="mono" style={{ color: "var(--ink)", fontWeight: 700 }}>.pot</span>{" "}
+                name and point it at your account, your records, your identity — readable across every dApp on the chain.
+              </p>
+            </div>
 
-        <section className="mt-12">
-          <div className="mb-4 flex justify-center">
-            <div className="inline-flex rounded-xl border border-line bg-surface p-0.5">
-              <ModeTab active={mode === "mint"} onClick={() => setMode("mint")}>
-                Mint a name
-              </ModeTab>
-              <ModeTab active={mode === "lookup"} onClick={() => setMode("lookup")}>
-                Look up an address
-              </ModeTab>
+            {/* hero doodle cluster */}
+            <div
+              style={{
+                position: "relative",
+                display: "grid",
+                placeItems: "center",
+                minHeight: 240,
+              }}
+            >
+              <div className="floaty" style={{ transform: "rotate(-6deg)" }}>
+                <NameTag size={210} />
+              </div>
+              <div
+                aria-hidden
+                className="floaty"
+                style={{ position: "absolute", top: 6, right: -4, ['--rot' as never]: "10deg" }}
+              >
+                <CoinDoodle size={84} />
+              </div>
             </div>
           </div>
+        </div>
 
-          {mode === "mint" ? <NameConsole /> : <AddressLookup />}
-        </section>
+        <div className="wrap" style={{ marginTop: 26 }}>
+          <SearchConsole />
+        </div>
 
-        <YourNames />
+        <div className="wrap" style={{ marginTop: 56 }}>
+          <YourNames variant="teaser" />
+        </div>
 
-        <FeatureRow />
+        <div className="wrap" style={{ marginTop: 64 }}>
+          <div className="row spread" style={{ alignItems: "flex-end", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
+            <h2 className="h2" style={{ fontSize: 34, margin: 0 }}>
+              One protocol,<br />three guarantees.
+            </h2>
+            <span className="body-txt" style={{ maxWidth: 280, fontSize: 14 }}>
+              Six ink! contracts on a non-EVM Substrate chain. Here&apos;s what they buy you.
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 22 }}>
+            {FEATURES.map((f) => (
+              <div
+                key={f.title}
+                className={`card card-${f.color}`}
+                style={{ padding: "26px 26px 30px", minHeight: 268, display: "flex", flexDirection: "column" }}
+              >
+                <Dashes widths={[24, 16, 20, 11]} />
+                <div style={{ flex: 1, display: "grid", placeItems: "center", margin: "10px 0 6px" }}>
+                  <f.Doodle size={110} />
+                </div>
+                <h3 className="h2" style={{ fontSize: 25, margin: "0 0 8px" }}>{f.title}</h3>
+                <p className="body-txt" style={{ fontSize: 14, margin: 0 }}>{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <div className="mt-14 rounded-2xl border border-line bg-surface/60 p-6 text-center">
-          <p className="text-sm text-ink-soft">
-            Building on Portaldot? Resolve <span className="font-mono">.pot</span>{" "}
-            names from your own app.
-          </p>
-          <Link
-            href="/docs"
-            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-accent shadow-glow transition-colors duration-150 hover:bg-accent-strong"
+        <div className="wrap" style={{ marginTop: 56 }}>
+          <div
+            className="card card-paper"
+            style={{
+              padding: "34px 36px",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 36,
+              alignItems: "center",
+            }}
           >
-            Read the SDK docs
-            <Arrow />
-          </Link>
+            <div>
+              <Eyebrow>Building on Portaldot?</Eyebrow>
+              <h2 className="h2" style={{ fontSize: 32, margin: "12px 0 10px" }}>
+                Resolve <span className="mono">.pot</span> names from your own app.
+              </h2>
+              <p className="body-txt" style={{ maxWidth: 380 }}>
+                TypeScript on npm and a matching Python client share one{" "}
+                <span style={{ fontWeight: 700, color: "var(--ink)" }} className="mono">blake2_256</span> namehash
+                spec. Zero-config{" "}
+                <span className="mono" style={{ fontWeight: 700, color: "var(--ink)" }}>connect()</span>, network
+                presets included.
+              </p>
+              <div className="row gap-12" style={{ marginTop: 20 }}>
+                <Link href="/docs">
+                  <Btn variant="dark">Read the SDK docs</Btn>
+                </Link>
+                <span className="chip">npm i portaldot-pns</span>
+              </div>
+            </div>
+            <CodeBlock
+              lang="typescript"
+              lines={[
+                'import { connect } from "portaldot-pns";',
+                '',
+                'const pns   = await connect();',
+                'const acct  = await pns.resolve("alice.pot");',
+                'const name  = await pns.reverse(acct);',
+              ]}
+            />
+          </div>
         </div>
       </main>
 
       <SiteFooter />
-    </div>
-  );
-}
-
-function FeatureRow() {
-  const items = [
-    {
-      title: "One name, one identity",
-      body: "Map a human handle to an account and records, resolved the same way by every dApp.",
-    },
-    {
-      title: "Forward-verified reverse",
-      body: "Address → name only resolves when the name points back. Spoofed records are dropped.",
-    },
-    {
-      title: "Length-tier pricing",
-      body: "Shorter names cost more, in POT, with annual rent and a grace period before release.",
-    },
-  ];
-  return (
-    <div className="mt-16 grid gap-3 sm:grid-cols-3">
-      {items.map((f) => (
-        <div key={f.title} className="rounded-xl border border-line bg-surface/50 p-5">
-          <h3 className="text-sm font-medium text-ink">{f.title}</h3>
-          <p className="mt-1.5 text-[0.82rem] leading-relaxed text-ink-faint">
-            {f.body}
-          </p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ModeTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={
-        "rounded-[10px] px-4 py-2 text-sm font-medium transition-colors duration-150 " +
-        (active ? "bg-elevated text-ink shadow-panel" : "text-ink-faint hover:text-ink")
-      }
-    >
-      {children}
-    </button>
-  );
-}
-
-function Arrow() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    </>
   );
 }

@@ -1,45 +1,39 @@
 "use client";
 
 import { useEffect } from "react";
-import Lenis from "lenis";
 
 /**
- * Wraps a subtree in a Lenis smooth-scroll instance. Lenis intercepts wheel /
- * touch input and lerps the scroll position each rAF tick, giving the weighted,
- * inertial feel the pitch deck relies on. We also expose the instance on
- * `window.__lenis` so in-page anchor buttons can call `scrollTo` through Lenis
- * (a raw `scrollIntoView` would fight the smoothing and jump).
+ * SmoothScroll — adds smooth scrolling + exposes a tiny window.__lenis-like
+ * shim so existing call sites (window.__lenis?.scrollTo(...)) keep working
+ * without bringing in the lenis dependency. We use the browser's native
+ * scrollTo({ behavior: "smooth" }) under the hood.
  */
-declare global {
-  interface Window {
-    __lenis?: Lenis;
-  }
-}
-
 export function SmoothScroll({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    const lenis = new Lenis({
-      duration: 1.15,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-      wheelMultiplier: 1,
-      touchMultiplier: 1.6,
-    });
-    window.__lenis = lenis;
-
-    let raf = 0;
-    const loop = (time: number) => {
-      lenis.raf(time);
-      raf = requestAnimationFrame(loop);
+    const lenis = {
+      scrollTo: (target: string | HTMLElement, opts?: { offset?: number }) => {
+        const el = typeof target === "string" ? document.querySelector(target) : target;
+        if (!el) return;
+        const top = (el as HTMLElement).getBoundingClientRect().top + window.scrollY + (opts?.offset ?? 0);
+        window.scrollTo({ top, behavior: "smooth" });
+      },
     };
-    raf = requestAnimationFrame(loop);
-
+    (window as Window & { __lenis?: typeof lenis }).__lenis = lenis;
+    const prev = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = "smooth";
     return () => {
-      cancelAnimationFrame(raf);
-      lenis.destroy();
-      delete window.__lenis;
+      document.documentElement.style.scrollBehavior = prev;
+      delete (window as Window & { __lenis?: typeof lenis }).__lenis;
     };
   }, []);
 
   return <>{children}</>;
+}
+
+declare global {
+  interface Window {
+    __lenis?: {
+      scrollTo: (target: string | HTMLElement, opts?: { offset?: number }) => void;
+    };
+  }
 }

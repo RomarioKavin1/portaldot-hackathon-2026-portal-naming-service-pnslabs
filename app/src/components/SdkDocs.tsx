@@ -1,167 +1,186 @@
 "use client";
 
 import { useState } from "react";
-import { CodeBlock, CommandLine } from "@/components/ui";
+import { Btn, CodeBlock, Eyebrow, Seg } from "@/components/ui";
+import { KeyDoodle, CoinStack, ScribbleUnderline } from "@/components/doodles";
 
-const PKG = "portaldot-pns";
+type PM = "npm" | "pnpm" | "yarn";
 
-const INSTALL: Record<string, string> = {
-  npm: `npm install ${PKG}`,
-  pnpm: `pnpm add ${PKG}`,
-  yarn: `yarn add ${PKG}`,
+const INSTALL: Record<PM, string> = {
+  npm: "npm install portaldot-pns",
+  pnpm: "pnpm add portaldot-pns",
+  yarn: "yarn add portaldot-pns",
 };
 
-const QUICKSTART = `import { connect } from "${PKG}";
+const QUICKSTART = [
+  'import { connect } from "portaldot-pns";',
+  '',
+  'const pns = await connect();',
+  '',
+  '// forward: name → account',
+  'const acct = await pns.resolve("alice.pot");',
+  '',
+  '// reverse: account → primary name',
+  'const name = await pns.reverse(acct);',
+  '',
+  'await pns.disconnect();',
+];
 
-// testnet, zero config (deployment is bundled)
-const pns = await connect();
+const CUSTOM = [
+  'import { connect } from "portaldot-pns";',
+  '',
+  'const pns = await connect({',
+  '  url: "wss://my-portaldot.node",',
+  '  contracts: {',
+  '    registry: "5C…",',
+  '    potRegistrar: "5D…",',
+  '    registrarController: "5E…",',
+  '    publicResolver: "5F…",',
+  '    reverseRegistrar: "5G…",',
+  '  },',
+  '});',
+];
 
-const addr = await pns.resolve("alice.pot");   // → "5Grw…" | null
-const name = await pns.reverse(addr);            // → "alice.pot" (forward-verified)
-
-await pns.disconnect();`;
-
-const CUSTOM_RPC = `import { connect } from "${PKG}";
-
-// your own node or mainnet — same runtime, just point url at it
-const pns = await connect({
-  url: "wss://mainnet.portaldot.io",
-  contracts: {
-    registry:            "5…",
-    potRegistrar:        "5…",
-    registrarController: "5…",
-    publicResolver:      "5…",
-    reverseRegistrar:    "5…",  // optional, enables reverse()
-  },
-});`;
-
-const API: Array<[string, string]> = [
-  ["connect(cfg?)", "Open a client. No args → bundled testnet deployment."],
-  ["client.resolve(name)", "name.pot → SS58 address, or null. Normalizes first."],
-  ["client.reverse(addr)", "address → primary name, only if it forward-verifies."],
-  ["client.disconnect()", "Close the WebSocket connection."],
-  ["namehash(name)", "ENS-style blake2_256 namehash of a full name."],
-  ["normalize(name)", "Canonicalize a name; throws on invalid input."],
-  ["NETWORKS", "Built-in network presets (testnet, mainnet)."],
+const API_ROWS = [
+  { sig: "connect(opts?)", ret: "Promise<PnsClient>", note: "Zero-config or pass a custom RPC + contract set." },
+  { sig: "resolve(name)", ret: "Promise<Account | null>", note: "Forward resolution — alice.pot → SS58." },
+  { sig: "reverse(addr)", ret: "Promise<string | null>", note: "Reverse, forward-verified to defeat spoofing." },
+  { sig: "namehash(name)", ret: "Uint8Array (32 bytes)", note: "blake2_256 namehash — identical in TS & Python." },
+  { sig: "normalize(name)", ret: "string", note: "Canonicalize a label before hashing or display." },
+  { sig: "disconnect()", ret: "Promise<void>", note: "Tear down the polkadot.js provider." },
 ];
 
 export function SdkDocs() {
-  const [mgr, setMgr] = useState<keyof typeof INSTALL>("npm");
+  const [pm, setPm] = useState<PM>("npm");
 
   return (
-    <div className="space-y-12">
-      <header>
-        <p className="font-mono text-xs uppercase tracking-[0.22em] text-accent-ink">
-          TypeScript SDK
-        </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-          Integrate <span className="font-mono">.pot</span> names
-        </h1>
-        <p className="mt-3 max-w-prose text-[0.95rem] leading-relaxed text-ink-soft">
-          Resolve and reverse-resolve names from any app. Works against the
-          testnet out of the box, or any node you point it at.
-        </p>
-        <a
-          href={`https://www.npmjs.com/package/${PKG}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 font-mono text-sm text-ink-soft transition-colors duration-150 hover:border-line-strong hover:text-ink"
-        >
-          {PKG}
-          <ExternalIcon />
-        </a>
-      </header>
-
-      <Section n={1} title="Install">
-        <div className="mb-2.5 inline-flex rounded-lg border border-line bg-surface p-0.5">
-          {(Object.keys(INSTALL) as Array<keyof typeof INSTALL>).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMgr(m)}
-              className={
-                "rounded-md px-3 py-1.5 font-mono text-xs transition-colors duration-150 " +
-                (mgr === m ? "bg-elevated text-ink shadow-panel" : "text-ink-faint hover:text-ink")
-              }
-            >
-              {m}
-            </button>
-          ))}
+    <div className="view-in">
+      <div className="wrap" style={{ paddingTop: 34, paddingBottom: 8 }}>
+        <div className="row spread" style={{ alignItems: "flex-end", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <Eyebrow>TypeScript & Python SDK</Eyebrow>
+            <h1 className="display" style={{ fontSize: "clamp(40px,5vw,60px)", margin: "16px 0 0" }}>
+              SDK <span className="scribble-u">docs<ScribbleUnderline /></span>
+            </h1>
+            <p className="lead" style={{ marginTop: 16, maxWidth: 520 }}>
+              Resolve, register, and read records from TypeScript or Python — one canonical namehash spec, no indexer.
+            </p>
+          </div>
+          <span className="chip" style={{ fontSize: 12 }}>portaldot-pns · npm</span>
         </div>
-        <CommandLine command={INSTALL[mgr]} />
-      </Section>
+      </div>
 
-      <Section n={2} title="Resolve & reverse">
-        <CodeBlock code={QUICKSTART} lang="ts" />
-      </Section>
-
-      <Section n={3} title="Your own node or mainnet">
-        <CodeBlock code={CUSTOM_RPC} lang="ts" />
-        <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-          Mainnet runs the identical runtime as testnet, so the same code path
-          works. Pass <span className="font-mono">contracts</span> for any
-          network without a bundled deployment.
-        </p>
-      </Section>
-
-      <Section n={4} title="API reference">
-        <div className="overflow-hidden rounded-xl border border-line">
-          <table className="w-full text-left text-sm">
-            <tbody>
-              {API.map(([sig, desc], i) => (
-                <tr
-                  key={sig}
-                  className={i % 2 ? "bg-surface/40" : "bg-surface-2/40"}
-                >
-                  <td className="whitespace-nowrap border-b border-line px-4 py-3 align-top font-mono text-[0.82rem] text-accent-ink">
-                    {sig}
-                  </td>
-                  <td className="border-b border-line px-4 py-3 text-ink-soft">
-                    {desc}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="wrap" style={{ marginTop: 18, display: "grid", gridTemplateColumns: "1fr", gap: 22 }}>
+        <div className="card card-paper" style={{ padding: "26px 28px", border: "1.5px solid var(--line)" }}>
+          <div className="row spread" style={{ marginBottom: 14, flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <Eyebrow>1 · Install</Eyebrow>
+              <h3 className="h2" style={{ fontSize: 24, margin: "8px 0 14px" }}>Install the SDK</h3>
+            </div>
+            <Seg
+              options={[
+                { id: "npm", label: "npm" },
+                { id: "pnpm", label: "pnpm" },
+                { id: "yarn", label: "yarn" },
+              ]}
+              value={pm}
+              onChange={setPm}
+            />
+          </div>
+          <CodeBlock lang="bash" lines={[INSTALL[pm]]} />
+          <p className="body-txt" style={{ fontSize: 13.5, marginTop: 12 }}>
+            Requires Node ≥ 18. The Python client (<span className="mono" style={{ color: "var(--ink)", fontWeight: 700 }}>portal_name</span>) exposes the same primitives — <span className="mono">pip install portal_name</span>.
+          </p>
         </div>
-        <p className="mt-3 text-xs text-ink-faint">
-          Names are normalized before hashing; reverse resolution is always
-          forward-verified.
-        </p>
-      </Section>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 22 }}>
+          <div className="card card-blush" style={{ padding: "26px 28px" }}>
+            <Eyebrow>2 · Quickstart</Eyebrow>
+            <h3 className="h2" style={{ fontSize: 24, margin: "8px 0 16px" }}>Resolve both ways</h3>
+            <CodeBlock lang="typescript" lines={QUICKSTART} />
+          </div>
+          <div className="card card-mint" style={{ padding: "26px 28px" }}>
+            <Eyebrow>3 · Target any node</Eyebrow>
+            <h3 className="h2" style={{ fontSize: 24, margin: "8px 0 16px" }}>Custom RPC & contracts</h3>
+            <CodeBlock lang="typescript" lines={CUSTOM} />
+          </div>
+        </div>
+
+        <div className="card card-paper" style={{ padding: "26px 28px", border: "1.5px solid var(--line)" }}>
+          <div className="row spread" style={{ alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <Eyebrow>4 · Reference</Eyebrow>
+              <h3 className="h2" style={{ fontSize: 24, margin: "8px 0 0" }}>Client API</h3>
+            </div>
+            <KeyDoodle size={56} />
+          </div>
+          <div style={{ borderTop: "1.5px solid var(--line-soft)" }}>
+            {API_ROWS.map((r) => (
+              <div
+                key={r.sig}
+                className="row"
+                style={{
+                  gap: 18,
+                  padding: "14px 4px",
+                  borderBottom: "1.5px solid var(--line-soft)",
+                  alignItems: "baseline",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span className="mono" style={{ fontWeight: 700, fontSize: 14, color: "var(--ink)", minWidth: 190 }}>{r.sig}</span>
+                <span className="mono" style={{ fontSize: 12.5, color: "var(--ink-soft)", minWidth: 170 }}>{r.ret}</span>
+                <span className="body-txt" style={{ fontSize: 13.5, flex: 1, minWidth: 200 }}>{r.note}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card card-peach" style={{ padding: "26px 28px" }}>
+          <div className="row spread" style={{ alignItems: "flex-end", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <Eyebrow>Length-tier pricing</Eyebrow>
+              <h3 className="h2" style={{ fontSize: 24, margin: "8px 0 0" }}>Annual cost in POT</h3>
+            </div>
+            <CoinStack size={56} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
+            {[
+              { t: "5+ chars", p: 5, tag: "standard" },
+              { t: "4 chars", p: 40 },
+              { t: "3 chars", p: 160 },
+              { t: "1–2 chars", p: 640, tag: "premium" },
+            ].map((x) => (
+              <div
+                key={x.t}
+                style={{
+                  background: "var(--paper)",
+                  borderRadius: 16,
+                  padding: "18px 16px",
+                  border: "1.5px solid var(--line-soft)",
+                }}
+              >
+                <div className="body-txt" style={{ fontSize: 13 }}>{x.t}</div>
+                <div className="display" style={{ fontSize: 30, margin: "4px 0 2px" }}>{x.p}</div>
+                <div className="mono" style={{ fontSize: 11, color: "var(--ink-soft)" }}>POT / year</div>
+                {x.tag && (
+                  <span className="tag tag-ink" style={{ fontSize: 9.5, marginTop: 8 }}>
+                    {x.tag}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="row gap-12" style={{ marginTop: 8 }}>
+          <a href="https://www.npmjs.com/package/portaldot-pns" target="_blank" rel="noreferrer">
+            <Btn variant="dark">Open on npm</Btn>
+          </a>
+          <a href="https://github.com/RomarioKavin1/PortalNamingService" target="_blank" rel="noreferrer">
+            <Btn variant="ghost">Source on GitHub</Btn>
+          </a>
+        </div>
+      </div>
     </div>
-  );
-}
-
-function Section({
-  n,
-  title,
-  children,
-}: {
-  n: number;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="grid grid-cols-[auto_1fr] gap-x-4">
-      <div className="flex flex-col items-center">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface font-mono text-xs text-accent-ink">
-          {n}
-        </span>
-        <span className="mt-1 w-px flex-1 bg-line" />
-      </div>
-      <div className="min-w-0 pb-2">
-        <h2 className="mb-3 text-base font-medium text-ink">{title}</h2>
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function ExternalIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M14 5h5v5M19 5l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M18 14v3a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
   );
 }
