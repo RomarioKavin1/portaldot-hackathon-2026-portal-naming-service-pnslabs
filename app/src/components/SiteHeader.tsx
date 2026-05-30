@@ -21,6 +21,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-1.5">
           <NetworkSwitch />
           <NavLink href="/docs">Docs</NavLink>
+          <NavLink href="/pitch">Pitch</NavLink>
           {privyEnabled && <AccountButton />}
         </div>
       </div>
