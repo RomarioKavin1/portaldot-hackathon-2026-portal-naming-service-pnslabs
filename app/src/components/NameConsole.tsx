@@ -3,17 +3,11 @@
 import { useMemo, useState } from "react";
 import { tryNormalize } from "portaldot-pns";
 import type { InjectedAccountWithMeta } from "@polkadot/extension-inject/types";
-import { getClient } from "@/lib/pns";
+import { useNetwork } from "@/lib/network-context";
 import { listAccounts } from "@/lib/wallet";
 import { registerName } from "@/lib/register";
 import { shortAddr, quote60d } from "@/lib/format";
 import { Button, Field, inputClass, CopyButton } from "@/components/ui";
-
-const ADDRS = {
-  registry: process.env.NEXT_PUBLIC_PNS_REGISTRY ?? "",
-  controller: process.env.NEXT_PUBLIC_PNS_REGISTRAR_CONTROLLER ?? "",
-  resolver: process.env.NEXT_PUBLIC_PNS_PUBLIC_RESOLVER ?? "",
-};
 
 type Result =
   | { kind: "searching"; name: string }
@@ -22,6 +16,7 @@ type Result =
   | { kind: "error"; message: string };
 
 export function NameConsole() {
+  const { net, getClient } = useNetwork();
   const [raw, setRaw] = useState("");
   const [result, setResult] = useState<Result | null>(null);
 
@@ -30,7 +25,7 @@ export function NameConsole() {
     normalized !== null && normalized.length >= 1 && normalized.length <= 32;
 
   const search = async () => {
-    if (!valid || !normalized) return;
+    if (!valid || !normalized || !net.ready) return;
     setResult({ kind: "searching", name: normalized });
     try {
       const client = await getClient();
@@ -45,10 +40,20 @@ export function NameConsole() {
     }
   };
 
+  if (!net.ready) {
+    return (
+      <div className="rounded-2xl border border-line bg-surface p-6 text-sm text-ink-soft shadow-panel">
+        <span className="font-medium text-ink">{net.label} is not live yet.</span>{" "}
+        Contract addresses for this network have not been configured. Switch to a
+        live network from the selector above.
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-2.5 sm:flex-row">
-        <div className="flex flex-1 items-stretch overflow-hidden rounded-xl border border-line bg-panel shadow-sm transition-colors duration-150 focus-within:border-accent">
+        <div className="group flex flex-1 items-stretch overflow-hidden rounded-2xl border border-line bg-surface shadow-panel transition-[border-color,box-shadow] duration-200 focus-within:border-accent/60 focus-within:shadow-glow-lg">
           <input
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
@@ -57,9 +62,9 @@ export function NameConsole() {
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            className="min-w-0 flex-1 bg-transparent px-4 py-4 font-mono text-base text-ink outline-none placeholder:text-ink-faint/70"
+            className="min-w-0 flex-1 bg-transparent px-5 py-5 font-mono text-lg text-ink outline-none placeholder:text-ink-faint/60"
           />
-          <span className="flex select-none items-center pr-4 font-mono text-base text-accent-ink">
+          <span className="flex select-none items-center pr-5 font-mono text-lg text-accent-ink">
             .pot
           </span>
         </div>
@@ -67,7 +72,7 @@ export function NameConsole() {
           onClick={search}
           disabled={!valid}
           loading={result?.kind === "searching"}
-          className="py-4 sm:px-7"
+          className="py-5 text-base sm:px-8"
         >
           Search
         </Button>
@@ -82,7 +87,7 @@ export function NameConsole() {
 
       {result && (
         <div className="mt-5 pns-rise">
-          <ResultView result={result} onClaimed={search} />
+          <ResultView result={result} onMinted={search} />
         </div>
       )}
     </div>
@@ -91,20 +96,20 @@ export function NameConsole() {
 
 function ResultView({
   result,
-  onClaimed,
+  onMinted,
 }: {
   result: Result;
-  onClaimed: () => void;
+  onMinted: () => void;
 }) {
   if (result.kind === "searching") {
     return (
-      <div className="h-[5.5rem] animate-pulse rounded-xl border border-line bg-inset" />
+      <div className="h-[6.5rem] animate-pulse rounded-2xl border border-line bg-surface" />
     );
   }
 
   if (result.kind === "error") {
     return (
-      <div className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3.5 text-sm text-danger">
+      <div className="rounded-2xl border border-danger/40 bg-danger-soft/40 px-5 py-4 text-sm text-danger">
         {result.message}
       </div>
     );
@@ -112,128 +117,117 @@ function ResultView({
 
   if (result.kind === "taken") {
     return (
-      <div className="rounded-xl border border-line bg-panel p-5 shadow-panel">
-        <div className="flex items-center gap-2">
-          <Dot tone="accent" />
-          <span className="text-xs font-medium uppercase tracking-[0.14em] text-accent-ink">
-            Registered
-          </span>
-        </div>
-        <p className="mt-3 font-mono text-xl text-ink">
+      <div className="rounded-2xl border border-line bg-surface p-6 shadow-panel">
+        <Eyebrow tone="neutral">Registered</Eyebrow>
+        <p className="mt-3 font-mono text-2xl text-ink">
           {result.name}
           <span className="text-accent-ink">.pot</span>
         </p>
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-line bg-inset px-3.5 py-2.5">
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3">
           <div className="min-w-0">
-            <p className="text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint">
+            <p className="text-[0.7rem] uppercase tracking-[0.16em] text-ink-faint">
               Resolves to
             </p>
-            <p className="mt-0.5 truncate font-mono text-sm text-ink" title={result.address}>
-              {shortAddr(result.address, 10, 10)}
+            <p className="mt-1 truncate font-mono text-sm text-ink" title={result.address}>
+              {shortAddr(result.address, 12, 10)}
             </p>
           </div>
-          <CopyButton value={result.address} label="Copy address" />
+          <CopyButton value={result.address} label="Copy" />
         </div>
       </div>
     );
   }
 
-  // free
-  return <ClaimPanel name={result.name} onClaimed={onClaimed} />;
+  return <MintPanel name={result.name} onMinted={onMinted} />;
 }
 
-/* ── Claim flow (wallet detection + commit-reveal register) ──────────── */
+/* ── Mint flow ───────────────────────────────────────────────────────── */
 
-type Claim =
+type Mint =
   | { kind: "intro" }
   | { kind: "no-wallet" }
   | { kind: "no-accounts" }
   | { kind: "ready" }
-  | { kind: "registering"; step: string }
+  | { kind: "minting"; step: string }
   | { kind: "error"; message: string };
 
-function ClaimPanel({ name, onClaimed }: { name: string; onClaimed: () => void }) {
-  const [claim, setClaim] = useState<Claim>({ kind: "intro" });
+function MintPanel({ name, onMinted }: { name: string; onMinted: () => void }) {
+  const { net, getClient } = useNetwork();
+  const [mint, setMint] = useState<Mint>({ kind: "intro" });
   const [accounts, setAccounts] = useState<InjectedAccountWithMeta[]>([]);
   const [signer, setSigner] = useState("");
 
   const price = useMemo(() => quote60d(name.length), [name]);
 
   const connect = async () => {
-    setClaim({ kind: "registering", step: "Connecting wallet…" });
+    setMint({ kind: "minting", step: "Connecting wallet…" });
     try {
       const accs = await listAccounts();
       if (accs.length === 0) {
-        setClaim({ kind: "no-accounts" });
+        setMint({ kind: "no-accounts" });
         return;
       }
       setAccounts(accs);
       setSigner(accs[0]!.address);
-      setClaim({ kind: "ready" });
+      setMint({ kind: "ready" });
     } catch {
-      setClaim({ kind: "no-wallet" });
+      setMint({ kind: "no-wallet" });
     }
   };
 
-  const doRegister = async () => {
+  const doMint = async () => {
     if (!signer) return;
-    setClaim({ kind: "registering", step: "Preparing…" });
+    setMint({ kind: "minting", step: "Preparing…" });
     try {
       const client = await getClient();
       await registerName({
         api: client.connection.api,
         fromAddress: signer,
-        controller: ADDRS.controller,
-        registry: ADDRS.registry,
-        resolver: ADDRS.resolver,
+        controller: net.contracts.registrarController,
+        registry: net.contracts.registry,
+        resolver: net.contracts.publicResolver,
         rawName: name,
-        onStep: (step) => setClaim({ kind: "registering", step }),
+        onStep: (step) => setMint({ kind: "minting", step }),
       });
-      onClaimed(); // re-run search → flips to the "registered" view
+      onMinted();
     } catch (e: unknown) {
-      setClaim({ kind: "error", message: msg(e) });
+      setMint({ kind: "error", message: msg(e) });
     }
   };
 
   return (
-    <div className="rounded-xl border border-accent/30 bg-panel p-5 shadow-panel">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="overflow-hidden rounded-2xl border border-accent/40 bg-surface shadow-glow">
+      <div className="flex flex-wrap items-start justify-between gap-4 p-6">
         <div>
-          <div className="flex items-center gap-2">
-            <Dot tone="accent" />
-            <span className="text-xs font-medium uppercase tracking-[0.14em] text-accent-ink">
-              Available
-            </span>
-          </div>
-          <p className="mt-3 font-mono text-xl text-ink">
+          <Eyebrow tone="ok">Available</Eyebrow>
+          <p className="mt-3 font-mono text-2xl text-ink">
             {name}
             <span className="text-accent-ink">.pot</span>
           </p>
+          <p className="mt-2 text-xs text-ink-faint">
+            No resolving record. Length-tier pricing per spec §5.
+          </p>
         </div>
         <div className="text-right">
-          <p className="font-mono text-lg text-ink">{price}</p>
-          <p className="text-[0.7rem] uppercase tracking-[0.14em] text-ink-faint">
+          <p className="font-mono text-xl text-ink">{price}</p>
+          <p className="text-[0.7rem] uppercase tracking-[0.16em] text-ink-faint">
             POT · 60 days
           </p>
         </div>
       </div>
 
-      <p className="mt-1.5 text-xs text-ink-faint">
-        No resolving record found. Pricing follows the length tiers in spec §5.
-      </p>
-
-      <div className="mt-4 border-t border-line pt-4">
-        {claim.kind === "intro" && (
+      <div className="border-t border-line bg-surface-2/50 p-6">
+        {mint.kind === "intro" && (
           <Button onClick={connect} className="w-full sm:w-auto">
-            Claim this name
+            Mint {name}.pot
           </Button>
         )}
 
-        {claim.kind === "no-wallet" && <NoWallet />}
-        {claim.kind === "no-accounts" && <NoAccounts />}
+        {mint.kind === "no-wallet" && <NoWallet />}
+        {mint.kind === "no-accounts" && <NoAccounts />}
 
-        {claim.kind === "ready" && (
-          <div className="space-y-3">
+        {mint.kind === "ready" && (
+          <div className="space-y-3.5">
             <Field label="Sign with">
               <div className="relative">
                 <select
@@ -250,25 +244,25 @@ function ClaimPanel({ name, onClaimed }: { name: string; onClaimed: () => void }
                 <Chevron />
               </div>
             </Field>
-            <Button onClick={doRegister} className="w-full sm:w-auto">
-              Register {name}.pot
+            <Button onClick={doMint} className="w-full sm:w-auto">
+              Mint {name}.pot
             </Button>
           </div>
         )}
 
-        {claim.kind === "registering" && (
+        {mint.kind === "minting" && (
           <div className="flex items-center gap-2.5 text-sm text-ink-soft">
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-accent border-t-transparent" />
-            {claim.step}
+            {mint.step}
           </div>
         )}
 
-        {claim.kind === "error" && (
+        {mint.kind === "error" && (
           <div className="space-y-3">
-            <p className="rounded-lg border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
-              {claim.message}
+            <p className="rounded-xl border border-danger/40 bg-danger-soft/40 px-4 py-3 text-sm text-danger">
+              {mint.message}
             </p>
-            <Button variant="ghost" onClick={() => setClaim({ kind: "ready" })}>
+            <Button variant="ghost" onClick={() => setMint({ kind: "ready" })}>
               Try again
             </Button>
           </div>
@@ -286,40 +280,40 @@ function NoWallet() {
         href="https://polkadot.js.org/extension/"
         target="_blank"
         rel="noreferrer"
-        className="font-medium text-accent-ink underline underline-offset-2 hover:text-accent-strong"
+        className="font-medium text-accent-ink underline underline-offset-2 hover:text-accent"
       >
         browser extension
       </a>{" "}
-      to sign registrations, then reload.
+      to sign, then reload.
     </p>
   );
 }
 
 function NoAccounts() {
+  const items: React.ReactNode[] = [
+    <>
+      Download{" "}
+      <a href="/alice.json" download className="font-medium text-accent-ink underline underline-offset-2 hover:text-accent">
+        alice.json
+      </a>{" "}
+      — the pre-funded <Mono>//Alice</Mono> dev account.
+    </>,
+    <>
+      In the Polkadot.js popup, click <Mono>+</Mono> →{" "}
+      <span className="text-ink">Restore account from backup JSON file</span>.
+    </>,
+    <>
+      Pick <Mono>alice.json</Mono>; the password is <Mono>password</Mono>.
+    </>,
+    <>Reload; Alice appears in the signer list, funded.</>,
+  ];
   return (
     <div className="text-sm leading-relaxed text-ink-soft">
       <p className="text-ink">
-        The extension is connected but has no accounts. Fastest path on the dev
-        node:
+        The extension is connected but has no accounts. Fastest path on testnet:
       </p>
-      <ol className="mt-3 space-y-2 [counter-reset:step]">
-        {[
-          <>
-            Download{" "}
-            <a href="/alice.json" download className="font-medium text-accent-ink underline underline-offset-2 hover:text-accent-strong">
-              alice.json
-            </a>{" "}
-            — the pre-funded <Mono>//Alice</Mono> dev account.
-          </>,
-          <>
-            In the Polkadot.js popup, click <Mono>+</Mono> →{" "}
-            <span className="text-ink">Restore account from backup JSON file</span>.
-          </>,
-          <>
-            Pick <Mono>alice.json</Mono>; the password is <Mono>password</Mono>.
-          </>,
-          <>Reload this page; Alice appears in the signer list, funded.</>,
-        ].map((li, i) => (
+      <ol className="mt-3 space-y-2">
+        {items.map((li, i) => (
           <li key={i} className="flex gap-3">
             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft font-mono text-[0.7rem] text-accent-ink">
               {i + 1}
@@ -332,22 +326,33 @@ function NoAccounts() {
   );
 }
 
-/* ── tiny atoms ──────────────────────────────────────────────────────── */
+/* ── atoms ───────────────────────────────────────────────────────────── */
 
-function Dot({ tone }: { tone: "accent" }) {
+function Eyebrow({
+  tone,
+  children,
+}: {
+  tone: "ok" | "neutral";
+  children: React.ReactNode;
+}) {
+  const color = tone === "ok" ? "text-ok" : "text-accent-ink";
+  const dot = tone === "ok" ? "bg-ok" : "bg-accent";
   return (
-    <span
-      className="relative flex h-2 w-2"
-      style={{ animation: "pns-pulse 2.4s ease-in-out infinite" }}
-    >
-      <span className={`h-2 w-2 rounded-full ${tone === "accent" ? "bg-accent" : ""}`} />
+    <span className="inline-flex items-center gap-2">
+      <span
+        className={`h-2 w-2 rounded-full ${dot}`}
+        style={{ animation: "pns-pulse 2.4s ease-in-out infinite" }}
+      />
+      <span className={`text-xs font-medium uppercase tracking-[0.16em] ${color}`}>
+        {children}
+      </span>
     </span>
   );
 }
 
 function Mono({ children }: { children: React.ReactNode }) {
   return (
-    <code className="rounded bg-inset px-1.5 py-0.5 font-mono text-[0.8em] text-ink">
+    <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[0.8em] text-ink">
       {children}
     </code>
   );
@@ -365,6 +370,5 @@ function Chevron() {
 }
 
 function msg(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  return String(e);
+  return e instanceof Error ? e.message : String(e);
 }

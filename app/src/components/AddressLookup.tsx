@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { getClient } from "@/lib/pns";
+import { useNetwork } from "@/lib/network-context";
 import { shortAddr } from "@/lib/format";
-import { Button, inputClass, CopyButton } from "@/components/ui";
+import { Button, inputClass } from "@/components/ui";
 
 type State =
   | { kind: "idle" }
@@ -13,12 +13,13 @@ type State =
   | { kind: "error"; message: string };
 
 export function AddressLookup() {
+  const { net, getClient } = useNetwork();
   const [input, setInput] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
 
   const lookup = async () => {
     const addr = input.trim();
-    if (!addr) return;
+    if (!addr || !net.ready) return;
     setState({ kind: "loading" });
     try {
       const client = await getClient();
@@ -28,6 +29,15 @@ export function AddressLookup() {
       setState({ kind: "error", message: e instanceof Error ? e.message : String(e) });
     }
   };
+
+  if (!net.ready) {
+    return (
+      <div className="rounded-2xl border border-line bg-surface p-6 text-sm text-ink-soft shadow-panel">
+        <span className="font-medium text-ink">{net.label} is not live yet.</span>{" "}
+        Switch to a live network to look up addresses.
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -40,35 +50,35 @@ export function AddressLookup() {
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          className={`${inputClass} flex-1 py-4 text-base`}
+          className={`${inputClass} flex-1 rounded-2xl py-5 text-base shadow-panel focus:shadow-glow-lg`}
         />
-        <Button onClick={lookup} loading={state.kind === "loading"} className="py-4 sm:px-7">
+        <Button onClick={lookup} loading={state.kind === "loading"} className="py-5 text-base sm:px-8">
           Look up
         </Button>
       </div>
 
       {state.kind === "ok" && (
-        <div className="mt-5 rounded-xl border border-line bg-panel p-5 shadow-panel pns-rise">
-          <div className="flex items-center gap-2 text-accent-ink">
+        <div className="mt-5 rounded-2xl border border-line bg-surface p-6 shadow-panel pns-rise">
+          <span className="inline-flex items-center gap-2 text-accent-ink">
             <CheckBadge />
-            <span className="text-xs font-medium uppercase tracking-[0.14em]">
+            <span className="text-xs font-medium uppercase tracking-[0.16em]">
               Primary name · forward-verified
             </span>
-          </div>
-          <p className="mt-3 font-mono text-xl text-ink">{state.name}</p>
-          <p className="mt-1 break-all font-mono text-xs text-ink-faint">{state.address}</p>
+          </span>
+          <p className="mt-3 font-mono text-2xl text-ink">{state.name}</p>
+          <p className="mt-1.5 break-all font-mono text-xs text-ink-faint">{state.address}</p>
         </div>
       )}
 
       {state.kind === "empty" && (
-        <div className="mt-5 rounded-xl border border-line bg-inset p-5 pns-rise">
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-ink-faint">
+        <div className="mt-5 rounded-2xl border border-line bg-surface-2 p-6 pns-rise">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-ink-faint">
             No verified primary name
           </p>
           <p className="mt-2 break-all font-mono text-sm text-ink-soft">
-            {shortAddr(state.address, 12, 12)}
+            {shortAddr(state.address, 14, 12)}
           </p>
-          <p className="mt-2.5 text-xs leading-relaxed text-ink-faint">
+          <p className="mt-3 text-xs leading-relaxed text-ink-faint">
             Either there is no reverse record, or it does not forward-verify back
             to this address. Spoofed reverse records are dropped on purpose.
           </p>
@@ -76,7 +86,7 @@ export function AddressLookup() {
       )}
 
       {state.kind === "error" && (
-        <div className="mt-5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3.5 text-sm text-danger pns-rise">
+        <div className="mt-5 rounded-2xl border border-danger/40 bg-danger-soft/40 px-5 py-4 text-sm text-danger pns-rise">
           {state.message}
         </div>
       )}

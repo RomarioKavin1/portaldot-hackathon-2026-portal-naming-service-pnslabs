@@ -6,8 +6,11 @@ export default {
     extend: {
       colors: {
         paper: "var(--bg)",
-        panel: "var(--panel)",
-        inset: "var(--inset)",
+        panel: "var(--surface)",
+        inset: "var(--surface-2)",
+        surface: "var(--surface)",
+        "surface-2": "var(--surface-2)",
+        elevated: "var(--elevated)",
         ink: {
           DEFAULT: "var(--ink)",
           soft: "var(--ink-soft)",
@@ -23,14 +26,16 @@ export default {
           soft: "var(--accent-soft)",
           ink: "var(--accent-ink)",
         },
+        "on-accent": "var(--on-accent)",
+        ok: {
+          DEFAULT: "var(--ok)",
+          soft: "var(--ok-soft)",
+        },
         danger: {
           DEFAULT: "var(--danger)",
           soft: "var(--danger-soft)",
         },
-        warn: {
-          DEFAULT: "var(--warn)",
-          soft: "var(--warn-soft)",
-        },
+        warn: "var(--warn)",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
@@ -38,8 +43,11 @@ export default {
       },
       boxShadow: {
         panel:
-          "0 1px 2px oklch(0.3 0.02 70 / 0.04), 0 8px 24px -12px oklch(0.3 0.02 70 / 0.12)",
-        lift: "0 2px 4px oklch(0.3 0.02 70 / 0.06), 0 16px 40px -16px oklch(0.3 0.02 70 / 0.18)",
+          "inset 0 1px 0 0 oklch(1 0 0 / 0.04), 0 12px 36px -16px oklch(0 0 0 / 0.7)",
+        lift:
+          "inset 0 1px 0 0 oklch(1 0 0 / 0.05), 0 24px 60px -24px oklch(0 0 0 / 0.8)",
+        glow: "0 8px 34px -10px var(--accent-glow)",
+        "glow-lg": "0 14px 50px -12px var(--accent-glow)",
       },
       ringColor: {
         accent: "var(--ring)",

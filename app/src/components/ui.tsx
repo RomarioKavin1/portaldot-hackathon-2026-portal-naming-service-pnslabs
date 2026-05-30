@@ -21,8 +21,8 @@ export function Button({
     "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-[background-color,color,box-shadow,opacity] duration-150 disabled:cursor-not-allowed disabled:opacity-45";
   const styles =
     variant === "primary"
-      ? "bg-accent text-paper shadow-sm hover:bg-accent-strong active:translate-y-px"
-      : "border border-line bg-panel text-ink-soft hover:border-line-strong hover:text-ink";
+      ? "bg-accent text-on-accent shadow-glow hover:bg-accent-strong active:translate-y-px"
+      : "border border-line bg-surface text-ink-soft hover:border-line-strong hover:bg-surface-2 hover:text-ink";
   return (
     <button
       {...rest}

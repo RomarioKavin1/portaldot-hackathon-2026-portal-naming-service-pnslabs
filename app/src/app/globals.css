@@ -3,37 +3,41 @@
 @tailwind utilities;
 
 /*
-  Portal Naming Service — "names registry" theme.
-  Ink on warm paper. Light by deliberate choice: this surface is half tool,
-  half documentation, read in daylight while integrating. One committed
-  accent (pine green) carries primary action + the .pot mark + "available".
-  Red is reserved for errors only. All neutrals tinted warm (~hue 75).
+  Portal Naming Service — premium dark.
+  Deep charcoal with a faint cool tint, layered surfaces for depth, one
+  refined violet accent used sparingly (primary action, the .pot mark, focus
+  glow). Green signals "available", red is errors only. Neutrals tinted cool
+  (~hue 280) at very low chroma so nothing reads as flat #000/#fff.
 */
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  --bg:          oklch(0.974 0.008 78);
-  --panel:       oklch(0.993 0.004 80);
-  --inset:       oklch(0.958 0.009 78);
+  --bg:         oklch(0.165 0.013 280);
+  --surface:    oklch(0.205 0.015 281);
+  --surface-2:  oklch(0.245 0.017 281);
+  --elevated:   oklch(0.225 0.016 281);
 
-  --ink:         oklch(0.255 0.013 62);
-  --ink-soft:    oklch(0.45 0.012 62);
-  --ink-faint:   oklch(0.62 0.010 66);
+  --ink:        oklch(0.965 0.006 285);
+  --ink-soft:   oklch(0.745 0.012 285);
+  --ink-faint:  oklch(0.565 0.014 285);
 
-  --line:        oklch(0.905 0.008 76);
-  --line-strong: oklch(0.84 0.010 73);
+  --line:       oklch(0.305 0.013 282);
+  --line-strong:oklch(0.385 0.016 282);
 
-  --accent:        oklch(0.49 0.094 159);
-  --accent-strong: oklch(0.42 0.10 159);
-  --accent-soft:   oklch(0.945 0.038 159);
-  --accent-ink:    oklch(0.40 0.094 159);
+  --accent:        oklch(0.635 0.185 290);
+  --accent-strong: oklch(0.575 0.205 290);
+  --accent-soft:   oklch(0.305 0.085 290);
+  --accent-ink:    oklch(0.815 0.115 290);
+  --on-accent:     oklch(0.99 0.004 290);
+  --accent-glow:   oklch(0.635 0.185 290 / 0.45);
 
-  --danger:      oklch(0.53 0.18 27);
-  --danger-soft: oklch(0.955 0.045 30);
-  --warn:        oklch(0.62 0.12 70);
-  --warn-soft:   oklch(0.955 0.05 80);
+  --ok:         oklch(0.74 0.15 156);
+  --ok-soft:    oklch(0.30 0.07 156);
+  --danger:     oklch(0.66 0.18 26);
+  --danger-soft:oklch(0.30 0.09 26);
+  --warn:       oklch(0.78 0.13 78);
 
-  --ring:        oklch(0.49 0.094 159 / 0.35);
+  --ring:       oklch(0.635 0.185 290 / 0.55);
 
   --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
     system-ui, sans-serif;
@@ -45,14 +49,19 @@ html {
 }
 
 body {
+  min-height: 100vh;
   background-color: var(--bg);
-  /* a single faint accent wash from the top-left, like ink bleeding into the
-     sheet; very low chroma so it never reads as a "crypto gradient". */
+  /* a single soft violet bloom from above for depth; very low chroma reach */
   background-image: radial-gradient(
-    120ch 60ch at 8% -10%,
-    oklch(0.49 0.094 159 / 0.05),
-    transparent 60%
-  );
+      90ch 52ch at 50% -16%,
+      oklch(0.635 0.185 290 / 0.13),
+      transparent 62%
+    ),
+    radial-gradient(
+      70ch 40ch at 92% 4%,
+      oklch(0.635 0.185 290 / 0.06),
+      transparent 60%
+    );
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans);
@@ -62,26 +71,36 @@ body {
 
 ::selection {
   background: var(--accent-soft);
-  color: var(--accent-ink);
+  color: var(--ink);
 }
 
-/* Consistent focus ring for every interactive element. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 8px;
+}
+
+/* subtle custom scrollbar to match the dark surface */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 @keyframes pns-pulse {
   0%, 100% { opacity: 1; }
-  50%      { opacity: 0.35; }
+  50%      { opacity: 0.4; }
 }
 
 @keyframes pns-rise {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(7px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes pns-glow {
+  0%, 100% { box-shadow: 0 0 0 1px var(--line), 0 10px 40px -16px var(--accent-glow); }
+  50%      { box-shadow: 0 0 0 1px var(--accent-soft), 0 14px 50px -14px var(--accent-glow); }
+}
+
 .pns-rise {
-  animation: pns-rise 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pns-rise 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

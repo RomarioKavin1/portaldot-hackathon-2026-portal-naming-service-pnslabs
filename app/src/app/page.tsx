@@ -1,100 +1,99 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { NameConsole } from "@/components/NameConsole";
 import { AddressLookup } from "@/components/AddressLookup";
-import { SdkDocs } from "@/components/SdkDocs";
+import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 
-const NODE =
-  process.env.NEXT_PUBLIC_PORTALDOT_WSS ?? "wss://portaldot.philotheephilix.in";
-const REPO = "https://github.com/RomarioKavin1/PortalNamingService";
-
-type Mode = "name" | "address";
+type Mode = "mint" | "lookup";
 
 export default function Home() {
-  const [mode, setMode] = useState<Mode>("name");
+  const [mode, setMode] = useState<Mode>("mint");
 
   return (
-    <div className="min-h-screen">
-      <TopBar />
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader />
 
-      <main className="mx-auto max-w-2xl px-6 pb-24 pt-14 sm:pt-20">
-        <header>
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent-ink">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-28 pt-16 sm:pt-24">
+        <header className="text-center">
+          <p className="font-mono text-xs uppercase tracking-[0.22em] text-accent-ink">
             Portaldot · naming registry
           </p>
-          <h1 className="mt-3 text-balance text-4xl font-semibold leading-[1.1] tracking-tight text-ink sm:text-5xl">
-            One name, one address,
-            <br className="hidden sm:block" /> one identity.
+          <h1 className="mx-auto mt-4 max-w-2xl text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-ink sm:text-6xl">
+            Own your name on Portaldot.
           </h1>
-          <p className="mt-4 max-w-prose text-[0.95rem] leading-relaxed text-ink-soft">
-            <span className="font-mono text-accent-ink">.pot</span> names map a
-            human-readable handle to an account across every Portaldot dApp.
-            Search to claim one, or look up who owns a name.
+          <p className="mx-auto mt-5 max-w-xl text-pretty text-[0.98rem] leading-relaxed text-ink-soft">
+            Mint a <span className="font-mono text-accent-ink">.pot</span> name
+            and point it at your account, your records, your identity, readable
+            across every dApp on the chain.
           </p>
         </header>
 
-        <section className="mt-9">
-          <div className="mb-3.5 inline-flex rounded-lg border border-line bg-inset p-0.5">
-            <ModeTab active={mode === "name"} onClick={() => setMode("name")}>
-              Search a name
-            </ModeTab>
-            <ModeTab active={mode === "address"} onClick={() => setMode("address")}>
-              Look up an address
-            </ModeTab>
+        <section className="mt-12">
+          <div className="mb-4 flex justify-center">
+            <div className="inline-flex rounded-xl border border-line bg-surface p-0.5">
+              <ModeTab active={mode === "mint"} onClick={() => setMode("mint")}>
+                Mint a name
+              </ModeTab>
+              <ModeTab active={mode === "lookup"} onClick={() => setMode("lookup")}>
+                Look up an address
+              </ModeTab>
+            </div>
           </div>
 
-          {mode === "name" ? <NameConsole /> : <AddressLookup />}
+          {mode === "mint" ? <NameConsole /> : <AddressLookup />}
         </section>
 
-        <hr className="my-16 border-line" />
+        <FeatureRow />
 
-        <SdkDocs />
+        <div className="mt-14 rounded-2xl border border-line bg-surface/60 p-6 text-center">
+          <p className="text-sm text-ink-soft">
+            Building on Portaldot? Resolve <span className="font-mono">.pot</span>{" "}
+            names from your own app.
+          </p>
+          <Link
+            href="/docs"
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-accent shadow-glow transition-colors duration-150 hover:bg-accent-strong"
+          >
+            Read the SDK docs
+            <Arrow />
+          </Link>
+        </div>
       </main>
 
-      <Footer node={NODE} repo={REPO} />
+      <SiteFooter />
     </div>
   );
 }
 
-function TopBar() {
+function FeatureRow() {
+  const items = [
+    {
+      title: "One name, one identity",
+      body: "Map a human handle to an account and records, resolved the same way by every dApp.",
+    },
+    {
+      title: "Forward-verified reverse",
+      body: "Address → name only resolves when the name points back. Spoofed records are dropped.",
+    },
+    {
+      title: "Length-tier pricing",
+      body: "Shorter names cost more, in POT, with annual rent and a grace period before release.",
+    },
+  ];
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-paper/80 backdrop-blur-md">
-      <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-3.5">
-        <a href="/" className="font-mono text-[0.95rem] font-semibold tracking-tight text-ink">
-          pns<span className="text-accent-ink">.pot</span>
-        </a>
-        <nav className="flex items-center gap-1">
-          <NavLink href="#sdk">SDK</NavLink>
-          <NavLink href="https://www.npmjs.com/package/portaldot-pns" external>
-            npm
-          </NavLink>
-          <NavLink href="https://github.com/RomarioKavin1/PortalNamingService" external>
-            GitHub
-          </NavLink>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
-function NavLink({
-  href,
-  external,
-  children,
-}: {
-  href: string;
-  external?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
-      className="rounded-md px-2.5 py-1.5 text-sm text-ink-soft transition-colors duration-150 hover:bg-inset hover:text-ink"
-    >
-      {children}
-    </a>
+    <div className="mt-16 grid gap-3 sm:grid-cols-3">
+      {items.map((f) => (
+        <div key={f.title} className="rounded-xl border border-line bg-surface/50 p-5">
+          <h3 className="text-sm font-medium text-ink">{f.title}</h3>
+          <p className="mt-1.5 text-[0.82rem] leading-relaxed text-ink-faint">
+            {f.body}
+          </p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -112,8 +111,8 @@ function ModeTab({
       onClick={onClick}
       aria-pressed={active}
       className={
-        "rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors duration-150 " +
-        (active ? "bg-panel text-ink shadow-sm" : "text-ink-faint hover:text-ink")
+        "rounded-[10px] px-4 py-2 text-sm font-medium transition-colors duration-150 " +
+        (active ? "bg-elevated text-ink shadow-panel" : "text-ink-faint hover:text-ink")
       }
     >
       {children}
@@ -121,27 +120,10 @@ function ModeTab({
   );
 }
 
-function Footer({ node, repo }: { node: string; repo: string }) {
+function Arrow() {
   return (
-    <footer className="border-t border-line">
-      <div className="mx-auto flex max-w-2xl flex-col gap-2 px-6 py-8 text-xs text-ink-faint sm:flex-row sm:items-center sm:justify-between">
-        <span className="inline-flex items-center gap-2">
-          <span
-            className="h-1.5 w-1.5 rounded-full bg-accent"
-            style={{ animation: "pns-pulse 2.4s ease-in-out infinite" }}
-          />
-          <code className="font-mono text-ink-soft">{node}</code>
-          <span className="text-ink-faint">· dev node, resets on restart</span>
-        </span>
-        <a
-          href={repo}
-          target="_blank"
-          rel="noreferrer"
-          className="text-ink-soft underline-offset-2 hover:text-ink hover:underline"
-        >
-          Source &amp; contracts
-        </a>
-      </div>
-    </footer>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
