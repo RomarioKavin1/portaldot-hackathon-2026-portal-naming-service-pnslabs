@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { SmoothScroll } from "@/components/SmoothScroll";
 import {
   CoinDoodle,
+  CoinStack,
   Dashes,
   KeyDoodle,
   LockDoodle,
+  LoopArrow,
   MagnifierDoodle,
   NameTag,
   ScribbleUnderline,
@@ -15,17 +17,19 @@ import {
   SketchDefs,
   Sparkle,
   StarDoodle,
+  Ticks,
   TreeDoodle,
+  VaultDoodle,
   WalletDoodle,
-  CoinStack,
 } from "@/components/doodles";
 import { Eyebrow } from "@/components/ui";
 
 /* ------------------------------------------------------------------ *
  * PNS investor pitch — single smooth-scrolling page.
- * YC/Sequoia sequence: Problem → Solution → Why Now → Market → Product
- *                      → Traction → Model → Competition → Team → Ask.
- * Same content as the previous deck, restyled in the pastel/doodle UI.
+ * YC sequence: Problem → Solution → Why Now → Market → Product
+ *              → Traction → Model → Competition → Team → Ask.
+ * Keyboard: ↓ Enter Space Tab → next section; ↑ Shift+Tab → prev.
+ * Esc → home.
  * ------------------------------------------------------------------ */
 
 const SLIDES = [
@@ -42,12 +46,86 @@ const SLIDES = [
   { id: "ask", label: "Ask" },
 ] as const;
 
+function scrollToSection(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (window.__lenis) window.__lenis.scrollTo(el);
+  else el.scrollIntoView({ behavior: "smooth" });
+}
+
 export default function PitchPage() {
+  const [active, setActive] = useState(0);
+  const activeRef = useRef(0);
+
+  // Track active section via intersection.
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            const i = SLIDES.findIndex((s) => s.id === e.target.id);
+            if (i >= 0) {
+              setActive(i);
+              activeRef.current = i;
+            }
+          }
+        });
+      },
+      { rootMargin: "-45% 0px -45% 0px" },
+    );
+    SLIDES.forEach((s) => {
+      const el = document.getElementById(s.id);
+      if (el) io.observe(el);
+    });
+    return () => io.disconnect();
+  }, []);
+
+  // Keyboard navigation: ↓ / Enter / Space / PageDown → next, ↑ / PageUp → prev.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Don't steal keys while typing in inputs/textareas.
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      const isNext = e.key === "ArrowDown" || e.key === "Enter" || e.key === " " || e.key === "PageDown";
+      const isPrev = e.key === "ArrowUp" || e.key === "PageUp";
+      if (isNext) {
+        e.preventDefault();
+        const next = Math.min(SLIDES.length - 1, activeRef.current + 1);
+        if (next !== activeRef.current) {
+          activeRef.current = next;
+          scrollToSection(SLIDES[next].id);
+        }
+      } else if (isPrev) {
+        e.preventDefault();
+        const prev = Math.max(0, activeRef.current - 1);
+        if (prev !== activeRef.current) {
+          activeRef.current = prev;
+          scrollToSection(SLIDES[prev].id);
+        }
+      } else if (e.key === "Home" || e.key === "g") {
+        e.preventDefault();
+        activeRef.current = 0;
+        scrollToSection(SLIDES[0].id);
+      } else if (e.key === "End" || e.key === "G") {
+        e.preventDefault();
+        activeRef.current = SLIDES.length - 1;
+        scrollToSection(SLIDES[SLIDES.length - 1].id);
+      } else if (e.key === "Escape") {
+        window.location.href = "/";
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <SmoothScroll>
       <SketchDefs />
       <Progress />
-      <RailNav />
+      <RailNav active={active} />
+      <KeyHint />
       <main style={{ position: "relative" }}>
         <Title />
         <Problem />
@@ -94,34 +172,7 @@ function Progress() {
   );
 }
 
-function RailNav() {
-  const [active, setActive] = useState(0);
-  useEffect(() => {
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            const i = SLIDES.findIndex((s) => s.id === e.target.id);
-            if (i >= 0) setActive(i);
-          }
-        });
-      },
-      { rootMargin: "-45% 0px -45% 0px" },
-    );
-    SLIDES.forEach((s) => {
-      const el = document.getElementById(s.id);
-      if (el) io.observe(el);
-    });
-    return () => io.disconnect();
-  }, []);
-
-  const go = (id: string) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (window.__lenis) window.__lenis.scrollTo(el);
-    else el.scrollIntoView({ behavior: "smooth" });
-  };
-
+function RailNav({ active }: { active: number }) {
   return (
     <nav
       style={{
@@ -140,7 +191,7 @@ function RailNav() {
       {SLIDES.map((s, i) => (
         <button
           key={s.id}
-          onClick={() => go(s.id)}
+          onClick={() => scrollToSection(s.id)}
           aria-label={s.label}
           style={{
             background: "none",
@@ -179,6 +230,34 @@ function RailNav() {
         </button>
       ))}
     </nav>
+  );
+}
+
+function KeyHint() {
+  return (
+    <div
+      className="mono"
+      style={{
+        position: "fixed",
+        left: 18,
+        bottom: 18,
+        zIndex: 50,
+        background: "rgba(26,23,20,0.06)",
+        border: "1px solid var(--line-soft)",
+        borderRadius: 99,
+        padding: "7px 13px",
+        fontSize: 11,
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        color: "var(--ink-soft)",
+        fontWeight: 700,
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+      }}
+    >
+      <span>↑ ↓ · enter · esc</span>
+    </div>
   );
 }
 
@@ -243,9 +322,10 @@ function Section({
         padding: "100px 5vw 100px",
         borderRadius: 0,
         boxShadow: "none",
+        overflow: "hidden",
       }}
     >
-      <div className="wrap" style={{ maxWidth: 1080 }}>
+      <div className="wrap" style={{ maxWidth: 1080, position: "relative", zIndex: 2 }}>
         {children}
       </div>
     </section>
@@ -262,11 +342,47 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* Decorative floating doodle anchored at a viewport corner / edge. */
+function Float({
+  children,
+  pos,
+  rot = 0,
+  opacity = 1,
+  z = 1,
+}: {
+  children: React.ReactNode;
+  pos: React.CSSProperties;
+  rot?: number;
+  opacity?: number;
+  z?: number;
+}) {
+  return (
+    <div
+      aria-hidden
+      className="floaty"
+      style={{
+        position: "absolute",
+        ...pos,
+        opacity,
+        zIndex: z,
+        ['--rot' as never]: `${rot}deg`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 /* ---- slides ---- */
 
 function Title() {
   return (
     <Section id="title" bg="card-blush">
+      <Float pos={{ left: "4%", top: "12%" }} rot={-8}><Sparkle size={36} /></Float>
+      <Float pos={{ right: "8%", top: "16%" }} rot={12}><StarDoodle size={32} /></Float>
+      <Float pos={{ left: "10%", bottom: "10%" }} rot={6}><Ticks size={44} /></Float>
+      <Float pos={{ right: "26%", bottom: "8%" }} rot={-4} opacity={0.85}><CoinDoodle size={70} /></Float>
+
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 50, alignItems: "center" }}>
         <div>
           <Reveal>
@@ -285,13 +401,21 @@ function Title() {
           </Reveal>
           <Reveal delay={380}>
             <div className="row gap-12" style={{ marginTop: 28, flexWrap: "wrap" }}>
-              <span className="chip">github.com/RomarioKavin1/PortalNamingService</span>
+              <a
+                href="https://github.com/RomarioKavin1/portaldot-hackathon-2026-portal-naming-service-pnslabs"
+                target="_blank"
+                rel="noreferrer"
+                className="chip"
+                style={{ textDecoration: "none", color: "var(--ink)" }}
+              >
+                github.com/…/portal-naming-service-pnslabs ↗
+              </a>
               <span className="chip">npm · portaldot-pns</span>
             </div>
           </Reveal>
         </div>
         <div className="floaty" style={{ display: "grid", placeItems: "center" }}>
-          <NameTag size={240} />
+          <NameTag size={260} />
         </div>
       </div>
     </Section>
@@ -301,6 +425,9 @@ function Title() {
 function Problem() {
   return (
     <Section id="problem" bg="card-peach">
+      <Float pos={{ right: "6%", top: "12%" }} rot={10}><MagnifierDoodle size={84} /></Float>
+      <Float pos={{ left: "8%", bottom: "12%" }} rot={-6}><Ticks size={40} /></Float>
+
       <SectionEyebrow>The problem</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 26px", maxWidth: 900 }}>
@@ -324,11 +451,24 @@ function Problem() {
             borderRadius: 18,
             border: "2px solid var(--ink)",
             maxWidth: 980,
+            position: "relative",
           }}
         >
           5Gg7tZDAPRUyoouUzeM1oo3K4migHxH31gcgXUqLS1AoErcZ
-          <div className="body-txt" style={{ fontSize: 13.5, marginTop: 10, fontWeight: 500, color: "var(--ink-soft)", fontFamily: "var(--font-body)" }}>
+          <div
+            className="body-txt"
+            style={{
+              fontSize: 13.5,
+              marginTop: 10,
+              fontWeight: 500,
+              color: "var(--ink-soft)",
+              fontFamily: "var(--font-body)",
+            }}
+          >
             48 characters. One typo sends funds to the void. You cannot read it, remember it, or trust it at a glance.
+          </div>
+          <div aria-hidden style={{ position: "absolute", right: -22, top: -22 }} className="floaty">
+            <Sparkle size={30} />
           </div>
         </div>
       </Reveal>
@@ -350,6 +490,10 @@ function Problem() {
 function Solution() {
   return (
     <Section id="solution" bg="card-mint">
+      <Float pos={{ left: "5%", top: "10%" }} rot={-6} opacity={0.9}><SignpostDoodle size={88} /></Float>
+      <Float pos={{ right: "6%", bottom: "14%" }} rot={10}><Sparkle size={34} /></Float>
+      <Float pos={{ left: "12%", bottom: "8%" }} rot={4}><StarDoodle size={28} /></Float>
+
       <SectionEyebrow>The solution</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,78px)", margin: "0 0 22px", maxWidth: 900 }}>
@@ -380,6 +524,10 @@ function Solution() {
 function WhyNow() {
   return (
     <Section id="why-now" bg="card-blush">
+      <Float pos={{ right: "6%", top: "12%" }} rot={-8}><LoopArrow size={70} /></Float>
+      <Float pos={{ left: "6%", bottom: "10%" }} rot={6}><VaultDoodle size={110} /></Float>
+      <Float pos={{ right: "18%", bottom: "10%" }} rot={4}><Sparkle size={30} /></Float>
+
       <SectionEyebrow>Why now</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 26px", maxWidth: 900 }}>
@@ -395,7 +543,13 @@ function WhyNow() {
           <Reveal key={h} delay={i * 110}>
             <div
               className="card card-paper"
-              style={{ padding: "22px 26px", display: "flex", gap: 22, alignItems: "flex-start", border: "1.5px solid var(--line)" }}
+              style={{
+                padding: "22px 26px",
+                display: "flex",
+                gap: 22,
+                alignItems: "flex-start",
+                border: "1.5px solid var(--line)",
+              }}
             >
               <span className="display" style={{ fontSize: 32, color: "var(--ink-soft)", flex: "0 0 auto" }}>
                 0{i + 1}
@@ -420,6 +574,10 @@ function Market() {
   ];
   return (
     <Section id="market" bg="card-mint">
+      <Float pos={{ right: "5%", top: "14%" }} rot={6}><CoinStack size={100} /></Float>
+      <Float pos={{ left: "6%", top: "10%" }} rot={-6}><Ticks size={36} /></Float>
+      <Float pos={{ left: "10%", bottom: "10%" }} rot={4}><StarDoodle size={28} /></Float>
+
       <SectionEyebrow>Market</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 22px", maxWidth: 900 }}>
@@ -459,6 +617,10 @@ function Market() {
 function Product() {
   return (
     <Section id="product" bg="card-peach">
+      <Float pos={{ right: "6%", top: "10%" }} rot={6}><MagnifierDoodle size={94} /></Float>
+      <Float pos={{ left: "6%", bottom: "12%" }} rot={-6}><Sparkle size={32} /></Float>
+      <Float pos={{ right: "20%", bottom: "12%" }} rot={8}><Ticks size={32} /></Float>
+
       <SectionEyebrow>Product · live today</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 22px", maxWidth: 900 }}>
@@ -480,11 +642,7 @@ function Product() {
           </div>
           <div style={{ padding: "32px 28px" }}>
             <div className="field" style={{ maxWidth: 560 }}>
-              <input
-                value="alice"
-                readOnly
-                style={{ caretColor: "var(--ink)" }}
-              />
+              <input value="alice" readOnly style={{ caretColor: "var(--ink)" }} />
               <span className="suffix">.pot</span>
               <span className="btn btn-dark">Search</span>
             </div>
@@ -518,13 +676,16 @@ function Product() {
 }
 
 function Traction() {
-  const stats: [string, string][] = [
-    ["6", "ink! contracts deployed & wired on testnet"],
-    ["1", "working dApp — mint, resolve, reverse, subnames"],
-    ["0→1", "first naming service ever on Portaldot"],
+  const stats: [string, string, React.ReactNode][] = [
+    ["6", "ink! contracts deployed & wired on testnet", <Sparkle size={26} key="s" />],
+    ["1", "working dApp — mint, resolve, reverse, subnames", <StarDoodle size={26} key="st" />],
+    ["0→1", "first naming service ever on Portaldot", <Ticks size={26} key="t" />],
   ];
   return (
     <Section id="traction" bg="card-mint">
+      <Float pos={{ left: "5%", top: "12%" }} rot={-8}><KeyDoodle size={90} /></Float>
+      <Float pos={{ right: "7%", bottom: "14%" }} rot={6}><CoinStack size={88} /></Float>
+
       <SectionEyebrow>Traction</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 26px", maxWidth: 900 }}>
@@ -532,7 +693,7 @@ function Traction() {
         </h2>
       </Reveal>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20 }}>
-        {stats.map(([n, l], i) => (
+        {stats.map(([n, l, dec], i) => (
           <Reveal key={l} delay={i * 100}>
             <div
               className="card card-paper"
@@ -544,11 +705,7 @@ function Traction() {
                 overflow: "hidden",
               }}
             >
-              {i === 0 && (
-                <div style={{ position: "absolute", right: 14, top: 14 }}>
-                  <Sparkle size={26} />
-                </div>
-              )}
+              <div style={{ position: "absolute", right: 14, top: 14 }}>{dec}</div>
               <div className="display" style={{ fontSize: 64 }}>{n}</div>
               <p className="body-txt" style={{ fontSize: 14, marginTop: 8 }}>{l}</p>
             </div>
@@ -573,6 +730,10 @@ function Model() {
   ];
   return (
     <Section id="model" bg="card-peach">
+      <Float pos={{ right: "6%", top: "14%" }} rot={-6}><CoinDoodle size={90} /></Float>
+      <Float pos={{ left: "5%", bottom: "12%" }} rot={6}><CoinStack size={92} /></Float>
+      <Float pos={{ right: "20%", bottom: "8%" }} rot={4}><Sparkle size={28} /></Float>
+
       <SectionEyebrow>Business model</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 22px", maxWidth: 900 }}>
@@ -589,8 +750,13 @@ function Model() {
           <Reveal key={len} delay={i * 80}>
             <div
               className="card card-paper"
-              style={{ padding: "20px 20px 22px", border: "1.5px solid var(--line)" }}
+              style={{ padding: "20px 20px 22px", border: "1.5px solid var(--line)", position: "relative" }}
             >
+              {i === 3 && (
+                <div style={{ position: "absolute", right: 10, top: 10 }}>
+                  <StarDoodle size={22} fill="#1A1714" color="#1A1714" />
+                </div>
+              )}
               <div className="body-txt" style={{ fontSize: 13 }}>{len}</div>
               <div className="display" style={{ fontSize: 40, margin: "6px 0 2px" }}>{price}</div>
               <div className="mono" style={{ fontSize: 11, color: "var(--ink-soft)" }}>POT / year</div>
@@ -606,6 +772,9 @@ function Model() {
 function Competition() {
   return (
     <Section id="competition" bg="card-blush">
+      <Float pos={{ right: "6%", top: "14%" }} rot={-6}><ShieldDoodle size={92} accent="#FBFAF8" /></Float>
+      <Float pos={{ left: "5%", bottom: "12%" }} rot={6}><KeyDoodle size={90} /></Float>
+
       <SectionEyebrow>Why we win</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 26px", maxWidth: 900 }}>
@@ -630,10 +799,23 @@ function Competition() {
               padding: "26px 28px",
               border: "2px solid var(--ink)",
               boxShadow: "0 24px 50px -22px rgba(40,30,25,0.45)",
+              position: "relative",
             }}
           >
+            <div aria-hidden style={{ position: "absolute", right: -16, top: -16 }} className="floaty">
+              <Sparkle size={28} />
+            </div>
             <Eyebrow>PNS</Eyebrow>
-            <ul style={{ marginTop: 16, paddingLeft: 18, color: "var(--ink)", fontSize: 14.5, lineHeight: 1.7, fontWeight: 600 }}>
+            <ul
+              style={{
+                marginTop: 16,
+                paddingLeft: 18,
+                color: "var(--ink)",
+                fontSize: 14.5,
+                lineHeight: 1.7,
+                fontWeight: 600,
+              }}
+            >
               <li>Native ink! on Portaldot.</li>
               <li>ENS-faithful architecture, ported, not faked.</li>
               <li>Reproducible 2021-toolchain build — our real moat.</li>
@@ -654,6 +836,10 @@ function Competition() {
 function Team() {
   return (
     <Section id="team" bg="card-mint">
+      <Float pos={{ right: "6%", top: "12%" }} rot={-6}><WalletDoodle size={100} /></Float>
+      <Float pos={{ left: "6%", bottom: "10%" }} rot={6}><TreeDoodle size={90} /></Float>
+      <Float pos={{ right: "20%", bottom: "12%" }} rot={4}><Ticks size={28} /></Float>
+
       <SectionEyebrow>Team</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(48px,7vw,98px)", margin: "0 0 22px" }}>pnslabs</h2>
@@ -672,7 +858,13 @@ function Team() {
           <Reveal key={x.t} delay={i * 100}>
             <div
               className="card card-paper"
-              style={{ padding: "22px 24px", border: "1.5px solid var(--line)", display: "flex", gap: 16, alignItems: "flex-start" }}
+              style={{
+                padding: "22px 24px",
+                border: "1.5px solid var(--line)",
+                display: "flex",
+                gap: 16,
+                alignItems: "flex-start",
+              }}
             >
               <div style={{ flex: "0 0 auto" }}>{x.d}</div>
               <div>
@@ -690,19 +882,26 @@ function Team() {
 function Ask() {
   return (
     <Section id="ask" bg="card-peach">
+      <Float pos={{ left: "8%", top: "12%" }} rot={-8}><Sparkle size={48} /></Float>
+      <Float pos={{ right: "10%", top: "10%" }} rot={10}><StarDoodle size={42} /></Float>
+      <Float pos={{ left: "12%", bottom: "10%" }} rot={6}><Ticks size={40} /></Float>
+      <Float pos={{ right: "8%", bottom: "12%" }} rot={-4}><KeyDoodle size={120} /></Float>
+
       <div style={{ textAlign: "center", position: "relative" }}>
-        <div style={{ position: "absolute", left: "10%", top: -20 }} className="floaty">
-          <Sparkle size={48} />
-        </div>
-        <div style={{ position: "absolute", right: "12%", top: -10 }} className="floaty">
-          <StarDoodle size={42} />
-        </div>
         <Reveal>
           <Eyebrow>The ask</Eyebrow>
         </Reveal>
         <Reveal delay={120}>
-          <h2 className="display" style={{ fontSize: "clamp(48px,7vw,102px)", margin: "22px auto 26px", maxWidth: 1000 }}>
-            Own the name layer of an <span className="scribble-u">entire chain<ScribbleUnderline /></span>.
+          <h2
+            className="display"
+            style={{ fontSize: "clamp(48px,7vw,102px)", margin: "22px auto 26px", maxWidth: 1000 }}
+          >
+            Own the name layer of an{" "}
+            <span className="scribble-u">
+              entire chain
+              <ScribbleUnderline />
+            </span>
+            .
           </h2>
         </Reveal>
         <Reveal delay={240}>
@@ -736,7 +935,9 @@ function Ask() {
             <a href="/" className="btn btn-dark btn-lg" style={{ textDecoration: "none" }}>
               Try the live dApp
             </a>
-            <span className="mono" style={{ fontSize: 13, color: "var(--ink-soft)" }}>pnslabs · hello@pns.pot</span>
+            <span className="mono" style={{ fontSize: 13, color: "var(--ink-soft)" }}>
+              pnslabs · hello@pns.pot
+            </span>
           </div>
         </Reveal>
       </div>
@@ -760,7 +961,13 @@ function RowCard({ doodle, t, b }: { doodle: React.ReactNode; t: string; b: stri
   return (
     <div
       className="card card-paper"
-      style={{ padding: "22px 24px", border: "1.5px solid var(--line)", display: "flex", gap: 18, alignItems: "flex-start" }}
+      style={{
+        padding: "22px 24px",
+        border: "1.5px solid var(--line)",
+        display: "flex",
+        gap: 18,
+        alignItems: "flex-start",
+      }}
     >
       <div style={{ flex: "0 0 auto" }}>{doodle}</div>
       <div>

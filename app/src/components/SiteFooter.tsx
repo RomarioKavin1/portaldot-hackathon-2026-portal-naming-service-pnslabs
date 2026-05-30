@@ -2,7 +2,7 @@
 
 import { useNetwork } from "@/lib/network-context";
 
-const REPO = "https://github.com/RomarioKavin1/PortalNamingService";
+const REPO = "https://github.com/RomarioKavin1/portaldot-hackathon-2026-portal-naming-service-pnslabs";
 
 export function SiteFooter() {
   const { net, netKey } = useNetwork();

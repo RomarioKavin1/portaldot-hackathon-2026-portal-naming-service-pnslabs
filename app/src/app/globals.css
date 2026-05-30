@@ -255,11 +255,22 @@ body::before {
 .doodle { display: block; }
 .doodle [stroke] { stroke-linecap: round; stroke-linejoin: round; }
 
-/* scribble underline */
-.scribble-u { position: relative; display: inline-block; }
+/* scribble underline — sits beneath the word with room to breathe */
+.scribble-u {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.18em;
+  line-height: 1.18;
+}
 .scribble-u svg {
-  position: absolute; left: -4%; right: -4%; bottom: -0.34em;
-  width: 108%; height: 0.42em; overflow: visible;
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  bottom: -0.12em;
+  width: 108%;
+  height: 0.46em;
+  overflow: visible;
+  pointer-events: none;
 }
 
 /* animations */

@@ -72,7 +72,6 @@ export function SiteHeader() {
             <Nav id="names" href="/names">My names</Nav>
             <Nav id="docs" href="/docs">Docs</Nav>
             <Nav id="pitch" href="/pitch">Pitch</Nav>
-            <Nav id="onboarding" href="/onboarding">Mobile</Nav>
           </nav>
         </div>
         <div className="row gap-12" style={{ alignItems: "center" }}>

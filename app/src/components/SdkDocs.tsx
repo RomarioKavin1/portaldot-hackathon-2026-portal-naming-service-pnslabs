@@ -176,7 +176,7 @@ export function SdkDocs() {
           <a href="https://www.npmjs.com/package/portaldot-pns" target="_blank" rel="noreferrer">
             <Btn variant="dark">Open on npm</Btn>
           </a>
-          <a href="https://github.com/RomarioKavin1/PortalNamingService" target="_blank" rel="noreferrer">
+          <a href="https://github.com/RomarioKavin1/portaldot-hackathon-2026-portal-naming-service-pnslabs" target="_blank" rel="noreferrer">
             <Btn variant="ghost">Source on GitHub</Btn>
           </a>
         </div>
