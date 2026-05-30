@@ -143,8 +143,16 @@ addresses change but the on-chain graph stays correct.
   with mandatory forward-verification, contract dry-run helpers.
 - **Python SDK** (`packages/sdk-py/`) — same pure functions,
   byte-identical cross-language conformance vs TS (5 unittest cases).
-- **Next.js dApp** (`app/`) — Resolve + Reverse cards, Tailwind, wired
-  via env vars to the deployed addresses. Builds clean.
+- **Next.js dApp** (`app/`) — three tabs:
+    * **Register**: pick a Polkadot.js-extension account, type a name,
+      one button runs the full commit-reveal → mint → set_resolver →
+      set_addr flow signed via the extension. Source:
+      `app/src/components/RegisterCard.tsx` +
+      `app/src/lib/register.ts` (calls @polkadot/extension-dapp
+      lazily so SSR doesn't crash on `window`).
+    * **Resolve name**: `name.pot` → SS58.
+    * **Reverse address**: SS58 → primary name, forward-verified.
+  Tailwind, wired via env vars to the deployed addresses. Builds clean.
 - **Deploy + wire orchestrator** (`scripts/deploy_pns.py`) — deploys
   all six in dependency order and runs the four wiring extrinsics.
   Idempotent re-runs use a fresh salt range.

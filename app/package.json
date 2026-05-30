@@ -9,10 +9,12 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@portal-name/sdk": "workspace:*",
-    "@polkadot/extension-dapp": "^0.58.4",
     "@polkadot/api": "^16.5.6",
+    "@polkadot/extension-dapp": "^0.58.4",
+    "@polkadot/extension-inject": "^0.63.1",
     "@polkadot/util": "^14.0.3",
+    "@polkadot/util-crypto": "^14.0.3",
+    "@portal-name/sdk": "workspace:*",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"

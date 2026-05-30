@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { ResolveCard } from "@/components/ResolveCard";
 import { ReverseCard } from "@/components/ReverseCard";
+import { RegisterCard } from "@/components/RegisterCard";
+
+type Tab = "register" | "resolve" | "reverse";
 
 export default function Home() {
-  const [tab, setTab] = useState<"resolve" | "reverse">("resolve");
+  const [tab, setTab] = useState<Tab>("register");
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
@@ -21,6 +24,9 @@ export default function Home() {
       </header>
 
       <div className="mb-6 inline-flex rounded-xl border border-zinc-800 bg-zinc-900/60 p-1 backdrop-blur-sm">
+        <TabButton active={tab === "register"} onClick={() => setTab("register")}>
+          Register
+        </TabButton>
         <TabButton active={tab === "resolve"} onClick={() => setTab("resolve")}>
           Resolve name
         </TabButton>
@@ -30,7 +36,9 @@ export default function Home() {
       </div>
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 backdrop-blur-sm">
-        {tab === "resolve" ? <ResolveCard /> : <ReverseCard />}
+        {tab === "register" && <RegisterCard />}
+        {tab === "resolve" && <ResolveCard />}
+        {tab === "reverse" && <ReverseCard />}
       </div>
 
       <footer className="mt-16 text-xs text-zinc-500">

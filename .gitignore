@@ -29,3 +29,4 @@ scripts/*_address.txt
 # Local secrets
 .env
 *.local
+app/tsconfig.tsbuildinfo
