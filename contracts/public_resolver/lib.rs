@@ -15,7 +15,7 @@ use ink_lang as ink;
 mod public_resolver {
     use ink_storage::collections::HashMap as StorageHashMap;
     use ink_storage::traits::{PackedLayout, SpreadLayout};
-    use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+    use ink_env::call::{build_call, utils::ReturnType, ExecutionInput, Selector};
     use ink_env::DefaultEnvironment;
     use ink_prelude::{string::String, vec::Vec};
 
@@ -23,39 +23,10 @@ mod public_resolver {
 
     // ----- record shapes (spec §4) -----
 
-    /// Name-based payment record (spec §6.2).
-    #[derive(
-        scale::Encode, scale::Decode, Clone, Debug, PartialEq, Eq,
-        SpreadLayout, PackedLayout,
-    )]
-    #[cfg_attr(
-        feature = "std",
-        derive(scale_info::TypeInfo, ink_storage::traits::StorageLayout)
-    )]
-    pub struct PaymentRecord {
-        pub recipient: AccountId,
-        pub preferred_asset: Option<u32>,    // Some(asset_id) -> pallet-assets
-        pub memo: Option<[u8; 32]>,          // optional content hash
-    }
-
-    /// On-chain identity profile (spec §6.1).
-    #[derive(
-        scale::Encode, scale::Decode, Clone, Debug, PartialEq, Eq,
-        SpreadLayout, PackedLayout,
-    )]
-    #[cfg_attr(
-        feature = "std",
-        derive(scale_info::TypeInfo, ink_storage::traits::StorageLayout)
-    )]
-    pub struct ProfileRecord {
-        pub display_name: String,
-        /// IPFS/Arweave content hash for the bio document.
-        pub bio_hash: Option<[u8; 32]>,
-        /// IPFS/Arweave content hash for the avatar image.
-        pub avatar_contenthash: Option<[u8; 32]>,
-        /// Mirror of native pallet-identity judgement result (resolved by SDK).
-        pub verified: bool,
-    }
+    // PaymentRecord / ProfileRecord (spec §6.1 / §6.2) deferred to v2 — they
+    // pushed the wasm above the runtime's CodeTooLarge cap. v1 surface keeps
+    // addr / text / name, which is enough for resolve, set-records, and the
+    // reverse demo.
 
     #[ink(storage)]
     pub struct PublicResolver {
@@ -64,8 +35,6 @@ mod public_resolver {
         addrs: StorageHashMap<(Node, u32), Vec<u8>>,
         /// (node, key) -> text value (utf8).
         texts: StorageHashMap<(Node, String), String>,
-        payments: StorageHashMap<Node, PaymentRecord>,
-        profiles: StorageHashMap<Node, ProfileRecord>,
         /// Reverse `name` record (spec §6.3). Set on the reverse node.
         names: StorageHashMap<Node, String>,
     }
@@ -88,16 +57,6 @@ mod public_resolver {
         #[ink(topic)]
         node: Node,
         key: String,
-    }
-    #[ink(event)]
-    pub struct PaymentChanged {
-        #[ink(topic)]
-        node: Node,
-    }
-    #[ink(event)]
-    pub struct ProfileChanged {
-        #[ink(topic)]
-        node: Node,
     }
     #[ink(event)]
     pub struct NameChanged {
@@ -123,8 +82,6 @@ mod public_resolver {
                 registry,
                 addrs: StorageHashMap::new(),
                 texts: StorageHashMap::new(),
-                payments: StorageHashMap::new(),
-                profiles: StorageHashMap::new(),
                 names: StorageHashMap::new(),
             }
         }
@@ -138,14 +95,6 @@ mod public_resolver {
         #[ink(message)]
         pub fn text(&self, node: Node, key: String) -> Option<String> {
             self.texts.get(&(node, key)).cloned()
-        }
-        #[ink(message)]
-        pub fn payment(&self, node: Node) -> Option<PaymentRecord> {
-            self.payments.get(&node).cloned()
-        }
-        #[ink(message)]
-        pub fn profile(&self, node: Node) -> Option<ProfileRecord> {
-            self.profiles.get(&node).cloned()
         }
         #[ink(message)]
         pub fn name(&self, node: Node) -> Option<String> {
@@ -183,22 +132,6 @@ mod public_resolver {
             Ok(())
         }
 
-        #[ink(message)]
-        pub fn set_payment(&mut self, node: Node, record: PaymentRecord) -> Result<()> {
-            self.only_node_owner(node)?;
-            self.payments.insert(node, record);
-            self.env().emit_event(PaymentChanged { node });
-            Ok(())
-        }
-
-        #[ink(message)]
-        pub fn set_profile(&mut self, node: Node, record: ProfileRecord) -> Result<()> {
-            self.only_node_owner(node)?;
-            self.profiles.insert(node, record);
-            self.env().emit_event(ProfileChanged { node });
-            Ok(())
-        }
-
         /// Reverse-resolution name record. Called from ReverseRegistrar after
         /// it confirms the caller owns the reverse node.
         #[ink(message)]
@@ -225,12 +158,14 @@ mod public_resolver {
         fn registry_owner(&self, node: Node) -> Result<Option<AccountId>> {
             const SEL_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x02];
             let res: Option<AccountId> = build_call::<DefaultEnvironment>()
-                .call_type(Call::new().callee(self.registry))
+                .callee(self.registry)
+                .gas_limit(0)
+                .transferred_value(0)
                 .exec_input(
                     ExecutionInput::new(Selector::new(SEL_OWNER))
                         .push_arg(node),
                 )
-                .returns::<Option<AccountId>>()
+                .returns::<ReturnType<Option<AccountId>>>()
                 .fire()
                 .map_err(|_| Error::RegistryCallFailed)?;
             Ok(res)

@@ -20,7 +20,7 @@ mod registrar_controller {
     use ink_storage::collections::HashMap as StorageHashMap;
     use ink_storage::traits::{PackedLayout, SpreadLayout};
     use ink_env::hash::Blake2x256;
-    use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+    use ink_env::call::{build_call, utils::ReturnType, ExecutionInput, Selector};
     use ink_env::DefaultEnvironment;
     use ink_prelude::vec::Vec;
     use ink_prelude::string::String;
@@ -140,8 +140,11 @@ mod registrar_controller {
         #[ink(message)]
         pub fn quote(&self, name_len: u32, duration_ms: u64) -> Balance {
             let yearly = self.price_per_year(name_len);
-            (yearly.saturating_mul(duration_ms as u128))
-                .saturating_div(YEAR_MS as u128)
+            // saturating_div isn't stabilized for u128 in rustc 1.52; YEAR_MS
+            // is non-zero so checked_div is safe and returns the right value.
+            yearly.saturating_mul(duration_ms as u128)
+                  .checked_div(YEAR_MS as u128)
+                  .unwrap_or(0)
         }
 
         #[ink(message)]
@@ -296,14 +299,16 @@ mod registrar_controller {
         ) -> Result<u64> {
             const SEL_REGISTER: [u8; 4] = [0xC0, 0xC0, 0x00, 0x01];
             build_call::<DefaultEnvironment>()
-                .call_type(Call::new().callee(self.registrar))
+                .callee(self.registrar)
+                .gas_limit(0)
+                .transferred_value(0)
                 .exec_input(
                     ExecutionInput::new(Selector::new(SEL_REGISTER))
                         .push_arg(label)
                         .push_arg(owner)
                         .push_arg(duration_ms),
                 )
-                .returns::<core::result::Result<u64, u8>>()
+                .returns::<ReturnType<core::result::Result<u64, u8>>>()
                 .fire()
                 .map_err(|_| Error::RegistrarCallFailed)?
                 .map_err(|_| Error::RegistrarCallFailed)
@@ -312,13 +317,15 @@ mod registrar_controller {
         fn registrar_renew(&mut self, label: Label, duration_ms: u64) -> Result<u64> {
             const SEL_RENEW: [u8; 4] = [0xC0, 0xC0, 0x00, 0x02];
             build_call::<DefaultEnvironment>()
-                .call_type(Call::new().callee(self.registrar))
+                .callee(self.registrar)
+                .gas_limit(0)
+                .transferred_value(0)
                 .exec_input(
                     ExecutionInput::new(Selector::new(SEL_RENEW))
                         .push_arg(label)
                         .push_arg(duration_ms),
                 )
-                .returns::<core::result::Result<u64, u8>>()
+                .returns::<ReturnType<core::result::Result<u64, u8>>>()
                 .fire()
                 .map_err(|_| Error::RegistrarCallFailed)?
                 .map_err(|_| Error::RegistrarCallFailed)
@@ -332,10 +339,13 @@ mod registrar_controller {
     }
 
     pub fn make_commitment_raw(name_bytes: &[u8], owner: AccountId, secret: [u8; 32]) -> [u8; 32] {
-        let owner_ref: &[u8; 32] = owner.as_ref();
+        // rc3's AccountId doesn't implement AsRef<[u8;32]>; SCALE-encode it
+        // (which yields the raw 32 bytes) and extend from that slice.
+        use scale::Encode;
+        let owner_bytes = owner.encode();
         let mut buf: Vec<u8> = Vec::with_capacity(name_bytes.len() + 32 + 32);
         buf.extend_from_slice(name_bytes);
-        buf.extend_from_slice(owner_ref);
+        buf.extend_from_slice(&owner_bytes);
         buf.extend_from_slice(&secret);
         let mut out = [0u8; 32];
         ink_env::hash_bytes::<Blake2x256>(&buf, &mut out);

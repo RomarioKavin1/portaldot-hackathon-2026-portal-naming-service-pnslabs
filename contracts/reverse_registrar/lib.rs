@@ -18,7 +18,7 @@ use ink_lang as ink;
 #[ink::contract]
 mod reverse_registrar {
     use ink_env::hash::Blake2x256;
-    use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+    use ink_env::call::{build_call, utils::ReturnType, ExecutionInput, Selector};
     use ink_env::DefaultEnvironment;
     use ink_prelude::{string::String, vec::Vec};
 
@@ -145,14 +145,16 @@ mod reverse_registrar {
         fn registry_set_subnode_owner(&mut self, label: Label, owner: AccountId) -> Result<Node> {
             const SEL_SET_SUBNODE_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x01];
             build_call::<DefaultEnvironment>()
-                .call_type(Call::new().callee(self.registry))
+                .callee(self.registry)
+                .gas_limit(0)
+                .transferred_value(0)
                 .exec_input(
                     ExecutionInput::new(Selector::new(SEL_SET_SUBNODE_OWNER))
                         .push_arg(self.addr_reverse_node)
                         .push_arg(label)
                         .push_arg(owner),
                 )
-                .returns::<core::result::Result<Node, u8>>()
+                .returns::<ReturnType<core::result::Result<Node, u8>>>()
                 .fire()
                 .map_err(|_| Error::RegistryCallFailed)?
                 .map_err(|_| Error::RegistryCallFailed)
@@ -161,13 +163,15 @@ mod reverse_registrar {
         fn registry_set_resolver(&mut self, node: Node, resolver: Option<AccountId>) -> Result<()> {
             const SEL_SET_RESOLVER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x04];
             build_call::<DefaultEnvironment>()
-                .call_type(Call::new().callee(self.registry))
+                .callee(self.registry)
+                .gas_limit(0)
+                .transferred_value(0)
                 .exec_input(
                     ExecutionInput::new(Selector::new(SEL_SET_RESOLVER))
                         .push_arg(node)
                         .push_arg(resolver),
                 )
-                .returns::<core::result::Result<(), u8>>()
+                .returns::<ReturnType<core::result::Result<(), u8>>>()
                 .fire()
                 .map_err(|_| Error::RegistryCallFailed)?
                 .map_err(|_| Error::RegistryCallFailed)
@@ -176,13 +180,15 @@ mod reverse_registrar {
         fn resolver_set_name(&mut self, node: Node, name: String) -> Result<()> {
             const SEL_RESOLVER_SET_NAME: [u8; 4] = [0xC0, 0x70, 0x1A, 0x06];
             build_call::<DefaultEnvironment>()
-                .call_type(Call::new().callee(self.default_resolver))
+                .callee(self.default_resolver)
+                .gas_limit(0)
+                .transferred_value(0)
                 .exec_input(
                     ExecutionInput::new(Selector::new(SEL_RESOLVER_SET_NAME))
                         .push_arg(node)
                         .push_arg(name),
                 )
-                .returns::<core::result::Result<(), u8>>()
+                .returns::<ReturnType<core::result::Result<(), u8>>>()
                 .fire()
                 .map_err(|_| Error::ResolverCallFailed)?
                 .map_err(|_| Error::ResolverCallFailed)
@@ -191,7 +197,10 @@ mod reverse_registrar {
 
     /// Canonical reverse label = labelhash( lowercase_hex(pubkey) ).
     pub fn label_of(who: &AccountId) -> Label {
-        let bytes: &[u8; 32] = who.as_ref();
+        // rc3's AccountId doesn't implement AsRef<[u8;32]>; SCALE-encoding
+        // yields the raw 32 bytes.
+        use scale::Encode;
+        let bytes = who.encode();
         let mut hex_buf = [0u8; 64];
         const HEX: &[u8; 16] = b"0123456789abcdef";
         for i in 0..32 {

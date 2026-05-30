@@ -23,7 +23,7 @@ mod subname_registrar {
     use ink_storage::collections::HashMap as StorageHashMap;
     use ink_storage::traits::{PackedLayout, SpreadLayout};
     use ink_env::hash::Blake2x256;
-    use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+    use ink_env::call::{build_call, utils::ReturnType, ExecutionInput, Selector};
     use ink_env::DefaultEnvironment;
 
     pub type Node = [u8; 32];
@@ -173,12 +173,14 @@ mod subname_registrar {
         fn registry_owner(&self, node: Node) -> Result<Option<AccountId>> {
             const SEL_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x02];
             build_call::<DefaultEnvironment>()
-                .call_type(Call::new().callee(self.registry))
+                .callee(self.registry)
+                .gas_limit(0)
+                .transferred_value(0)
                 .exec_input(
                     ExecutionInput::new(Selector::new(SEL_OWNER))
                         .push_arg(node),
                 )
-                .returns::<Option<AccountId>>()
+                .returns::<ReturnType<Option<AccountId>>>()
                 .fire()
                 .map_err(|_| Error::RegistryCallFailed)
         }
@@ -188,14 +190,16 @@ mod subname_registrar {
         ) -> Result<Node> {
             const SEL_SET_SUBNODE_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x01];
             build_call::<DefaultEnvironment>()
-                .call_type(Call::new().callee(self.registry))
+                .callee(self.registry)
+                .gas_limit(0)
+                .transferred_value(0)
                 .exec_input(
                     ExecutionInput::new(Selector::new(SEL_SET_SUBNODE_OWNER))
                         .push_arg(parent)
                         .push_arg(label)
                         .push_arg(owner),
                 )
-                .returns::<core::result::Result<Node, u8>>()
+                .returns::<ReturnType<core::result::Result<Node, u8>>>()
                 .fire()
                 .map_err(|_| Error::RegistryCallFailed)?
                 .map_err(|_| Error::RegistryCallFailed)

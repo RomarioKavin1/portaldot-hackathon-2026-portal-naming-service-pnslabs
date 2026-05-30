@@ -57,42 +57,25 @@ if [ ! -d "$REPO_ROOT/contracts/$CONTRACT" ]; then
   exit 1
 fi
 
+# Inside the container we run vanilla cargo build (not cargo contract
+# build, which hardcodes -Zbuild-std and bypasses our frozen index), then
+# wasm-opt for size. Linker flags add the three pallet-contracts 3.0.0
+# requirements: imported memory, declared memory max (== schedule.memory_pages
+# default of 16 = 1MiB), and a small stack so initial pages stay under 16.
 docker run --rm --platform=linux/amd64 \
   -v "$REPO_ROOT":/work \
   -v "$INDEX_HOST":/mirror/crates.io-index:ro \
+  -e CONTRACT="$CONTRACT" \
   pns-ink-build \
-  bash -c '
-    set -e
-    cd /work/contracts/'"$CONTRACT"'
-    # Linker flags that cargo-contract normally injects:
-    #   --import-memory     pallet-contracts requires the contract to IMPORT
-    #                       its linear memory from `env.memory`; default
-    #                       behaviour defines memory locally and the runtime
-    #                       rejects with "Other" / "CodeRejected".
-    #   -z stack-size=...   wasm-ld defaults to a 1 MiB stack (=16 pages),
-    #                       which combined with .data pushes initial memory
-    #                       to 17 pages — above pallet-contracts 3.0.0
-    #                       `max_memory_pages=16`. 64 KiB is plenty for ink!
-    #                       3.0.0-rc3 contracts and keeps initial well under
-    #                       the cap.
-    # --max-memory: pallet-contracts requires the imported memory's MAX
-    # pages to be declared (prepare.rs line ~385:
-    # "Maximum number of pages should be always declared."). 16 pages = 1 MiB,
-    # which matches the runtime's default `max_memory_pages` cap.
-    export RUSTFLAGS="-C link-arg=--import-memory -C link-arg=--max-memory=1048576 -C link-arg=-zstack-size=65536"
-    cargo +nightly-2021-03-01 build --target=wasm32-unknown-unknown --release --no-default-features
-    raw=target/wasm32-unknown-unknown/release/'"$CONTRACT"'.wasm
-    opt=target/wasm32-unknown-unknown/release/'"$CONTRACT"'.opt.wasm
-    # wasm-opt -Oz: aggressive size-shrink. The unoptimised 700 KiB+
-    # debug-info wasm we get from vanilla cargo build exceeds the runtime
-    # MaxCodeSize; -Oz typically drops by ~90% (strips debug, vacuums
-    # dead code, packs locals).
-    wasm-opt --strip-debug --strip-producers --vacuum \
-             --remove-unused-module-elements \
-             -Oz -o "$opt" "$raw"
-    mv "$opt" "$raw"
-    ls -l "$raw"
-  '
+  bash -c 'set -e
+cd "/work/contracts/$CONTRACT"
+export RUSTFLAGS="-C link-arg=--import-memory -C link-arg=--max-memory=1048576 -C link-arg=-zstack-size=65536"
+cargo +nightly-2021-03-01 build --target=wasm32-unknown-unknown --release --no-default-features
+raw="target/wasm32-unknown-unknown/release/${CONTRACT}.wasm"
+opt="target/wasm32-unknown-unknown/release/${CONTRACT}.opt.wasm"
+wasm-opt --strip-debug --strip-producers --vacuum --remove-unused-module-elements -Oz -o "$opt" "$raw"
+mv "$opt" "$raw"
+ls -l "$raw"'
 
 WASM="$REPO_ROOT/contracts/$CONTRACT/target/wasm32-unknown-unknown/release/$CONTRACT.wasm"
 if [ ! -f "$WASM" ]; then
