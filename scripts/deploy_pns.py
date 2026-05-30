@@ -187,6 +187,13 @@ def main():
          encode_account(s, controller_addr))
     print("  PotRegistrar: authorized RegistrarController")
 
+    # Open the commit-age window to (0, 7d). The controller defaults to a 60s
+    # minimum age between commit and register; the dApp commits + registers in
+    # one flow, so without this register() reverts with CommitmentTooNew.
+    send(s, kp, controller_addr, "set_commit_age_window",
+         (0).to_bytes(8, "little") + (7 * 24 * 3600 * 1000).to_bytes(8, "little"))
+    print("  RegistrarController: commit-age window opened (0, 7d)")
+
     # Top up each contract so it can cover rent. pallet-contracts 3.0.0
     # charges per-block storage rent against the contract's balance; once
     # the contract burns through its endowment, reads start failing with

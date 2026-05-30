@@ -103,7 +103,10 @@ def main() -> None:
     print(f"\nwrote {ENV_LOCAL} (preserved {sum('PRIVY' in k for k in env)} Privy "
           f"+ {sum('MAINNET' in k for k in env)} mainnet keys)")
 
-    # 3. seed demo names
+    # 3. extra rent headroom (deploy already tops 100 POT; 1000 lasts longer)
+    run([PY, "scripts/topup_contracts.py", "1000"])
+
+    # 4. seed demo names
     if seed:
         for name, uri in (("alice", "//Alice"), ("bob", "//Bob")):
             try:

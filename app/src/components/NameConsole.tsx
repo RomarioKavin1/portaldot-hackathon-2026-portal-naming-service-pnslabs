@@ -88,7 +88,17 @@ export function NameConsole() {
 
       {result && (
         <div className="mt-5 pns-rise">
-          <ResultView result={result} onMinted={search} />
+          <ResultView
+            result={result}
+            onMinted={(address) => {
+              // We just registered it to the signed-in account; show that
+              // directly rather than re-querying (the new block isn't
+              // immediately readable, which would briefly read as "free").
+              if (result && "name" in result) {
+                setResult({ kind: "taken", name: result.name, address });
+              }
+            }}
+          />
         </div>
       )}
     </div>
@@ -100,7 +110,7 @@ function ResultView({
   onMinted,
 }: {
   result: Result;
-  onMinted: () => void;
+  onMinted: (address: string) => void;
 }) {
   if (result.kind === "searching") {
     return (
@@ -151,7 +161,13 @@ type Phase =
   | { kind: "minting"; step: string }
   | { kind: "error"; message: string };
 
-function MintPanel({ name, onMinted }: { name: string; onMinted: () => void }) {
+function MintPanel({
+  name,
+  onMinted,
+}: {
+  name: string;
+  onMinted: (address: string) => void;
+}) {
   const { net, getClient } = useNetwork();
   const { ready, authenticated, login, address, wallet, signMessage } =
     useSubstrateAccount();
@@ -188,7 +204,7 @@ function MintPanel({ name, onMinted }: { name: string; onMinted: () => void }) {
         rawName: name,
         onStep: (step) => setPhase({ kind: "minting", step }),
       });
-      onMinted();
+      onMinted(address);
     } catch (e: unknown) {
       setPhase({ kind: "error", message: msg(e) });
     }
