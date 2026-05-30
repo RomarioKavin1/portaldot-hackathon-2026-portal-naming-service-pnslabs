@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { NetworkProvider } from "@/lib/network-context";
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jbmono.variable}`}>
       <body>
-        <NetworkProvider>{children}</NetworkProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -1,10 +1,10 @@
 "use client";
 
 import { ApiPromise } from "@polkadot/api";
+import type { Signer } from "@polkadot/api/types";
 import { blake2AsU8a, decodeAddress } from "@polkadot/util-crypto";
-import { u8aConcat, hexToU8a } from "@polkadot/util";
+import { u8aConcat } from "@polkadot/util";
 import { buildCallData, defaultSelector, namehash, normalize } from "portaldot-pns";
-import { signerForAddress } from "./wallet";
 
 const PLANCK = 100_000_000_000_000n; // 1 POT = 10^14
 const COIN_POT = 0xffff_0000;
@@ -31,7 +31,7 @@ function compactLen(n: number): Uint8Array {
 
 async function submit(
   api: ApiPromise,
-  signer: any,
+  signer: Signer,
   fromAddress: string,
   dest: string,
   value: bigint,
@@ -51,6 +51,7 @@ async function submit(
 
 export interface RegisterOpts {
   api: ApiPromise;
+  signer: Signer;               // polkadot.js signer (Privy-backed)
   fromAddress: string;          // signer (also: rent payer + owner of the name)
   controller: string;           // RegistrarController address
   registry: string;             // Registry address
@@ -73,14 +74,13 @@ export interface RegisterOpts {
  * `fromAddress` — i.e. the signer registers a name to itself.
  */
 export async function registerName(opts: RegisterOpts): Promise<{ node: Uint8Array; address: string }> {
-  const { api, fromAddress, controller, registry, resolver, onStep } = opts;
+  const { api, signer, fromAddress, controller, registry, resolver, onStep } = opts;
   const step = onStep ?? (() => {});
   const name = normalize(opts.rawName.toLowerCase());
   const labelBytes = new TextEncoder().encode(name);
   const ownerPubkey = decodeAddress(fromAddress);
   const secret = new Uint8Array(32).fill(0x42);
   const durationMs = opts.durationMs ?? 60 * 24 * 60 * 60 * 1000;
-  const signer = await signerForAddress(fromAddress);
 
   // 1. commit
   step("Committing…");

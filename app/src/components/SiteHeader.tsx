@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useNetwork } from "@/lib/network-context";
 import { NETWORK_ORDER, NETWORKS, type NetworkKey } from "@/lib/networks";
+import { privyEnabled } from "@/components/Providers";
+import { useSubstrateAccount } from "@/lib/use-account";
+import { shortAddr } from "@/lib/format";
 
 export function SiteHeader() {
   return (
@@ -18,9 +21,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-1.5">
           <NetworkSwitch />
           <NavLink href="/docs">Docs</NavLink>
-          <NavLink href="https://www.npmjs.com/package/portaldot-pns" external>
-            npm
-          </NavLink>
+          {privyEnabled && <AccountButton />}
         </div>
       </div>
     </header>
@@ -96,6 +97,81 @@ function NetworkSwitch() {
             Mainnet activates automatically once its contract addresses are set.
           </li>
         </ul>
+      )}
+    </div>
+  );
+}
+
+function AccountButton() {
+  const { ready, authenticated, login, logout, address } = useSubstrateAccount();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  if (!ready) {
+    return <span className="px-2.5 py-1.5 text-sm text-ink-faint">…</span>;
+  }
+
+  if (!authenticated) {
+    return (
+      <button
+        onClick={login}
+        className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-on-accent shadow-glow transition-colors duration-150 hover:bg-accent-strong"
+      >
+        Sign in
+      </button>
+    );
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 font-mono text-sm text-ink-soft transition-colors duration-150 hover:border-line-strong hover:text-ink"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-ok" />
+        {address ? shortAddr(address, 4, 4) : "wallet…"}
+        <Caret open={open} />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-line bg-elevated p-1 shadow-lift">
+          {address && (
+            <div className="px-2.5 py-2">
+              <p className="text-[0.62rem] uppercase tracking-[0.16em] text-ink-faint">
+                Your .pot account
+              </p>
+              <p className="mt-1 break-all font-mono text-xs text-ink-soft">
+                {address}
+              </p>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              navigator.clipboard?.writeText(address ?? "");
+              setOpen(false);
+            }}
+            className="w-full rounded-lg px-2.5 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-2"
+          >
+            Copy address
+          </button>
+          <button
+            onClick={() => {
+              logout();
+              setOpen(false);
+            }}
+            className="w-full rounded-lg px-2.5 py-2 text-left text-sm text-ink transition-colors duration-150 hover:bg-surface-2"
+          >
+            Sign out
+          </button>
+        </div>
       )}
     </div>
   );

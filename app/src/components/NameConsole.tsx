@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { tryNormalize } from "portaldot-pns";
-import type { InjectedAccountWithMeta } from "@polkadot/extension-inject/types";
 import { useNetwork } from "@/lib/network-context";
-import { listAccounts } from "@/lib/wallet";
+import { useSubstrateAccount } from "@/lib/use-account";
+import { createPrivySigner } from "@/lib/privy-signer";
 import { registerName } from "@/lib/register";
+import { requestFaucet } from "@/lib/faucet";
 import { shortAddr, quote60d } from "@/lib/format";
-import { Button, Field, inputClass, CopyButton } from "@/components/ui";
+import { Button, CopyButton } from "@/components/ui";
 
 type Result =
   | { kind: "searching"; name: string }
@@ -141,57 +142,55 @@ function ResultView({
   return <MintPanel name={result.name} onMinted={onMinted} />;
 }
 
-/* ── Mint flow ───────────────────────────────────────────────────────── */
+/* ── Mint flow (Privy login → faucet → on-chain register) ────────────── */
 
-type Mint =
-  | { kind: "intro" }
-  | { kind: "no-wallet" }
-  | { kind: "no-accounts" }
-  | { kind: "ready" }
+type Phase =
+  | { kind: "idle" }
+  | { kind: "funding" }
+  | { kind: "funded"; amount: string }
   | { kind: "minting"; step: string }
   | { kind: "error"; message: string };
 
 function MintPanel({ name, onMinted }: { name: string; onMinted: () => void }) {
   const { net, getClient } = useNetwork();
-  const [mint, setMint] = useState<Mint>({ kind: "intro" });
-  const [accounts, setAccounts] = useState<InjectedAccountWithMeta[]>([]);
-  const [signer, setSigner] = useState("");
+  const { ready, authenticated, login, address, wallet, signMessage } =
+    useSubstrateAccount();
+  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 
   const price = useMemo(() => quote60d(name.length), [name]);
+  const busy = phase.kind === "funding" || phase.kind === "minting";
 
-  const connect = async () => {
-    setMint({ kind: "minting", step: "Connecting wallet…" });
-    try {
-      const accs = await listAccounts();
-      if (accs.length === 0) {
-        setMint({ kind: "no-accounts" });
-        return;
-      }
-      setAccounts(accs);
-      setSigner(accs[0]!.address);
-      setMint({ kind: "ready" });
-    } catch {
-      setMint({ kind: "no-wallet" });
-    }
+  const fund = async () => {
+    if (!address) return;
+    setPhase({ kind: "funding" });
+    const r = await requestFaucet(address);
+    setPhase(
+      r.error
+        ? { kind: "error", message: r.error }
+        : { kind: "funded", amount: r.amount ?? "200" },
+    );
   };
 
-  const doMint = async () => {
-    if (!signer) return;
-    setMint({ kind: "minting", step: "Preparing…" });
+  const mint = async () => {
+    if (!address || !wallet) return;
+    setPhase({ kind: "minting", step: "Preparing…" });
     try {
       const client = await getClient();
+      const api = client.connection.api;
+      const signer = createPrivySigner(api, wallet, signMessage);
       await registerName({
-        api: client.connection.api,
-        fromAddress: signer,
+        api,
+        signer,
+        fromAddress: address,
         controller: net.contracts.registrarController,
         registry: net.contracts.registry,
         resolver: net.contracts.publicResolver,
         rawName: name,
-        onStep: (step) => setMint({ kind: "minting", step }),
+        onStep: (step) => setPhase({ kind: "minting", step }),
       });
       onMinted();
     } catch (e: unknown) {
-      setMint({ kind: "error", message: msg(e) });
+      setPhase({ kind: "error", message: msg(e) });
     }
   };
 
@@ -217,111 +216,68 @@ function MintPanel({ name, onMinted }: { name: string; onMinted: () => void }) {
       </div>
 
       <div className="border-t border-line bg-surface-2/50 p-6">
-        {mint.kind === "intro" && (
-          <Button onClick={connect} className="w-full sm:w-auto">
-            Mint {name}.pot
-          </Button>
-        )}
-
-        {mint.kind === "no-wallet" && <NoWallet />}
-        {mint.kind === "no-accounts" && <NoAccounts />}
-
-        {mint.kind === "ready" && (
-          <div className="space-y-3.5">
-            <Field label="Sign with">
-              <div className="relative">
-                <select
-                  value={signer}
-                  onChange={(e) => setSigner(e.target.value)}
-                  className={`${inputClass} appearance-none pr-9`}
-                >
-                  {accounts.map((a) => (
-                    <option key={a.address} value={a.address}>
-                      {a.meta.name ?? "account"} — {shortAddr(a.address, 8, 6)}
-                    </option>
-                  ))}
-                </select>
-                <Chevron />
-              </div>
-            </Field>
-            <Button onClick={doMint} className="w-full sm:w-auto">
-              Mint {name}.pot
+        {!ready ? (
+          <div className="flex items-center gap-2.5 text-sm text-ink-faint">
+            <Spinner /> Loading account…
+          </div>
+        ) : !authenticated ? (
+          <div>
+            <Button onClick={login} className="w-full sm:w-auto">
+              Sign in to mint
             </Button>
-          </div>
-        )}
-
-        {mint.kind === "minting" && (
-          <div className="flex items-center gap-2.5 text-sm text-ink-soft">
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-accent border-t-transparent" />
-            {mint.step}
-          </div>
-        )}
-
-        {mint.kind === "error" && (
-          <div className="space-y-3">
-            <p className="rounded-xl border border-danger/40 bg-danger-soft/40 px-4 py-3 text-sm text-danger">
-              {mint.message}
+            <p className="mt-2.5 text-xs text-ink-faint">
+              Sign in with email or Google. A wallet is created for you, no
+              extension required.
             </p>
-            <Button variant="ghost" onClick={() => setMint({ kind: "ready" })}>
-              Try again
-            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-2.5">
+              <div className="min-w-0">
+                <p className="text-[0.7rem] uppercase tracking-[0.16em] text-ink-faint">
+                  Your account
+                </p>
+                <p className="mt-0.5 truncate font-mono text-sm text-ink" title={address ?? ""}>
+                  {address ? shortAddr(address, 12, 10) : "creating wallet…"}
+                </p>
+              </div>
+              {address && <CopyButton value={address} label="Copy" />}
+            </div>
+
+            <div className="flex flex-col gap-2.5 sm:flex-row">
+              <Button onClick={mint} loading={phase.kind === "minting"} disabled={busy || !address}>
+                Mint {name}.pot
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={fund}
+                loading={phase.kind === "funding"}
+                disabled={busy || !address}
+              >
+                Get test POT
+              </Button>
+            </div>
+
+            {phase.kind === "minting" && (
+              <p className="text-sm text-ink-soft">{phase.step}</p>
+            )}
+            {phase.kind === "funded" && (
+              <p className="text-sm text-ok">
+                Funded {phase.amount} POT. You can mint now.
+              </p>
+            )}
+            {phase.kind === "error" && (
+              <p className="rounded-xl border border-danger/40 bg-danger-soft/40 px-4 py-3 text-sm text-danger">
+                {phase.message}
+              </p>
+            )}
+            <p className="text-xs text-ink-faint">
+              Need funds first? Tap <span className="text-ink">Get test POT</span>,
+              then mint. Minting signs four messages with your embedded wallet.
+            </p>
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function NoWallet() {
-  return (
-    <p className="text-sm leading-relaxed text-ink-soft">
-      No Polkadot.js extension detected. Install the{" "}
-      <a
-        href="https://polkadot.js.org/extension/"
-        target="_blank"
-        rel="noreferrer"
-        className="font-medium text-accent-ink underline underline-offset-2 hover:text-accent"
-      >
-        browser extension
-      </a>{" "}
-      to sign, then reload.
-    </p>
-  );
-}
-
-function NoAccounts() {
-  const items: React.ReactNode[] = [
-    <>
-      Download{" "}
-      <a href="/alice.json" download className="font-medium text-accent-ink underline underline-offset-2 hover:text-accent">
-        alice.json
-      </a>{" "}
-      — the pre-funded <Mono>//Alice</Mono> dev account.
-    </>,
-    <>
-      In the Polkadot.js popup, click <Mono>+</Mono> →{" "}
-      <span className="text-ink">Restore account from backup JSON file</span>.
-    </>,
-    <>
-      Pick <Mono>alice.json</Mono>; the password is <Mono>password</Mono>.
-    </>,
-    <>Reload; Alice appears in the signer list, funded.</>,
-  ];
-  return (
-    <div className="text-sm leading-relaxed text-ink-soft">
-      <p className="text-ink">
-        The extension is connected but has no accounts. Fastest path on testnet:
-      </p>
-      <ol className="mt-3 space-y-2">
-        {items.map((li, i) => (
-          <li key={i} className="flex gap-3">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft font-mono text-[0.7rem] text-accent-ink">
-              {i + 1}
-            </span>
-            <span>{li}</span>
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }
@@ -350,22 +306,9 @@ function Eyebrow({
   );
 }
 
-function Mono({ children }: { children: React.ReactNode }) {
+function Spinner() {
   return (
-    <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[0.8em] text-ink">
-      {children}
-    </code>
-  );
-}
-
-function Chevron() {
-  return (
-    <svg
-      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint"
-      width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden
-    >
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <span className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-accent border-t-transparent" />
   );
 }
 
