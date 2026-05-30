@@ -187,6 +187,20 @@ def main():
          encode_account(s, controller_addr))
     print("  PotRegistrar: authorized RegistrarController")
 
+    # Top up each contract so it can cover rent. pallet-contracts 3.0.0
+    # charges per-block storage rent against the contract's balance; once
+    # the contract burns through its endowment, reads start failing with
+    # "RentNotPaid" — even dry-run reads from the SDK. 100 POT per contract
+    # buys plenty of headroom for development.
+    print("\n--- topping up contracts (100 POT each) ---")
+    for k, v in addrs.items():
+        topup = s.compose_call("Balances", "transfer",
+                               {"dest": v, "value": 100 * PLANCK})
+        ext = s.create_signed_extrinsic(call=topup, keypair=kp)
+        rc = s.submit_extrinsic(ext, wait_for_inclusion=True)
+        assert rc.is_success, f"top-up failed for {k}"
+        print(f"  {k:22s} +100 POT")
+
     out_path = REPO_ROOT / "scripts" / "pns_addresses.json"
     with open(out_path, "w") as f:
         json.dump(addrs, f, indent=2)
