@@ -1,0 +1,20 @@
+{
+  "encoded": "SKvFtQwu3uRQsOlXr84q5K5JdeDTHlsqueiv55rS2YIAgAAAAQAAAAgAAACv/Z6Im/7r9s15foZBO6NeCwnjzdyCDHNJwcFBCWVhKHRlVIgeXGavrWNcqxFsvuhEsAhfYPPCjft8qRInQhoCpm2fRrDyd5gidpgU+4W90E51cnPKMTYn2/LhV/qgqkehWu5ruRAshb9jY0dgnRjghradkML70aU/g0lOW0qCrJ9YK1qR2MyAyNz2jR+6uNDWvmvsqTqMUwc7lc+a",
+  "encoding": {
+    "content": [
+      "pkcs8",
+      "sr25519"
+    ],
+    "type": [
+      "scrypt",
+      "xsalsa20-poly1305"
+    ],
+    "version": "3"
+  },
+  "address": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+  "meta": {
+    "name": "Alice (dev)",
+    "tags": [],
+    "whenCreated": 1780138666
+  }
+}

@@ -96,7 +96,45 @@ export function RegisterCard() {
     return (
       <NoticeBox
         title="No accounts in the extension"
-        body="Add an account to the Polkadot.js extension (it just needs to hold POT for rent + the registration fee, e.g. //Alice). Reload after creating one."
+        body={
+          <>
+            The Polkadot.js extension is connected but has no accounts.
+            Fastest path on the dev node:
+            <ol className="mt-3 space-y-2 pl-5 text-zinc-300 [list-style:decimal]">
+              <li>
+                Download{" "}
+                <a
+                  href="/alice.json"
+                  download
+                  className="text-pot-accent underline"
+                >
+                  alice.json
+                </a>{" "}
+                (the pre-funded <code>//Alice</code> dev account).
+              </li>
+              <li>
+                Open the Polkadot.js extension popup → click the{" "}
+                <code>+</code> button → choose{" "}
+                <span className="text-zinc-200">
+                  "Restore account from backup JSON file"
+                </span>
+                .
+              </li>
+              <li>
+                Pick the downloaded <code>alice.json</code> and enter
+                the password{" "}
+                <code className="rounded bg-zinc-800/60 px-1 py-0.5">
+                  password
+                </code>
+                .
+              </li>
+              <li>
+                Reload this page — Alice will appear in the signer
+                dropdown with 49,800+ POT to spend.
+              </li>
+            </ol>
+          </>
+        }
       />
     );
   }
