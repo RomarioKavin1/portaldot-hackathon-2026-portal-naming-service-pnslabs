@@ -357,7 +357,7 @@ mod pot_registrar {
         /// (We override the selector on Registry's side too; see registry/lib.rs
         /// TODO when wiring is finalized.)
         fn registry_set_subnode_owner(&mut self, label: Label, owner: AccountId) -> Result<()> {
-            const SELECTOR_SET_SUBNODE_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x01];
+            const SELECTOR_SET_SUBNODE_OWNER: [u8; 4] = [0x55, 0x25, 0x57, 0x50];
             build_call::<DefaultEnvironment>()
                 .callee(self.registry)
                 .gas_limit(0)

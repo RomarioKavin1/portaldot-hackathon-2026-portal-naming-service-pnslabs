@@ -297,7 +297,7 @@ mod registrar_controller {
             owner: AccountId,
             duration_ms: u64,
         ) -> Result<u64> {
-            const SEL_REGISTER: [u8; 4] = [0xC0, 0xC0, 0x00, 0x01];
+            const SEL_REGISTER: [u8; 4] = [0x22, 0x9B, 0x55, 0x3F];
             build_call::<DefaultEnvironment>()
                 .callee(self.registrar)
                 .gas_limit(0)
@@ -315,7 +315,7 @@ mod registrar_controller {
         }
 
         fn registrar_renew(&mut self, label: Label, duration_ms: u64) -> Result<u64> {
-            const SEL_RENEW: [u8; 4] = [0xC0, 0xC0, 0x00, 0x02];
+            const SEL_RENEW: [u8; 4] = [0xB5, 0x60, 0x40, 0x92];
             build_call::<DefaultEnvironment>()
                 .callee(self.registrar)
                 .gas_limit(0)

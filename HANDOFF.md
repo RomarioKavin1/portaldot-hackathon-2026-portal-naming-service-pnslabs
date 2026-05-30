@@ -1,85 +1,152 @@
-# Portal Naming Service — Handoff (2026-05-30)
+# Portal Naming Service — Handoff (2026-05-30, end-of-session)
 
-Checkpoint of where things stand. The design and planning are complete; the project is
-blocked on one thing: resurrecting the **2021-era ink! build toolchain** in 2026.
+Snapshot of the project state after the live-deploy session. The v1 stack
+is fully built, deployed, and end-to-end verified on the Portaldot dev
+node. Pick this up with `BUILD_AND_DEPLOY.md` for the mechanical recipe
+and `docs/superpowers/specs/2026-05-30-portal-naming-service-design.md`
+for the design spec.
 
 ## TL;DR
-- **What it is:** an ENS-style `.pot` naming service for the Portaldot chain (ink! contracts
-  + TS/Python SDK + Next.js dApp). Full design in `docs/superpowers/specs/`, plans in
-  `docs/superpowers/plans/`.
-- **Status:** design ✅, plan ✅, chain + toolchain identity verified ✅, build env 90% ✅.
-  **Blocked** building a contract because cargo-contract 0.12's `-Zbuild-std` re-resolves
-  deps against today's crates.io and pulls `edition2021` crates that rustc 1.52 can't parse.
-- **Best unblock:** get the working build environment (or a prebuilt `.contract`) from the
-  Portaldot node author (**fengsong**), who necessarily has one.
+- **All six PNS contracts are live and wired** on the Portaldot dev node
+  (`wss://portaldot.philotheephilix.in`). Addresses in
+  `scripts/pns_addresses.json` (and `app/.env.local` for the dApp).
+- **Both SDKs** (TypeScript `@portal-name/sdk` and Python `portal_name`)
+  pass cross-language conformance (36 tests total) against the same
+  blake2_256 vectors as the ink! Registry contract reads back from
+  on-chain.
+- **Next.js reference dApp** (`app/`) builds clean and is wired via
+  `app/.env.local` to the deployed addresses.
+- **End-to-end Python harness** (`scripts/test_e2e.py`) exercises the
+  full registration flow: commit-reveal → `.pot` mint → set addr record
+  → forward resolution.
+- **The build pipeline is finally working.** ink! 3.0.0-rc3 compiles
+  under nightly-2021-03-01 in the `pns-ink-build` Docker image with the
+  frozen 2021-05-05 crates.io-index mirror + RUSTFLAGS
+  (`--import-memory --max-memory=1048576 -zstack-size=65536`). Output
+  passes pallet-contracts 3.0.0's `prepare.rs` validation after
+  `scripts/strip_exports.py` removes the `__data_end`/`__heap_base`
+  globals.
 
-## Verified facts (do not re-derive)
-- **Chain:** Portaldot, spec 1002, metadata **V13**, rent-era `pallet-contracts` 3.0.0
-  (`claim_surcharge`, `instantiate_with_code`, **no** storage deposits / Weight V2 / upload_code).
-  Non-EVM. SS58 prefix 42. POT, 14 decimals. ExistentialDeposit 1 POT.
-  Mainnet and dev node run the **identical** runtime.
-- **Source:** github.com/portaldotVolunteer/Portaldot (Substrate 3.0.0 fork; built by
-  "fengsong"). Release binaries: github.com/portaldotVolunteer/Portaldot-node.
-- **Toolchain (from the source repo):** Rust **nightly-2021-03-01**, ink! **3.0.0-rc3**,
-  cargo-contract **0.12.1**, seal0 ABI, metadata v0. Confirmed by the first-party SDK
-  (`DeveloperPlatform/sdk_interface/contracts.py` parses metadata version 0).
-- **Endpoints / faucet:** see `rpc.md`. Dev node `wss://portaldot.philotheephilix.in`
-  (hosted by the user's friend; resets state on restart). `//Alice` is Sudo + faucet master.
+## Where to point new sessions
+1. **Stable rules:** `CLAUDE.md`.
+2. **Hands-on recipe:** `BUILD_AND_DEPLOY.md` — prereqs, frozen-index
+   orphan-commit trick, build → patch → deploy → verify, dApp env, FAQ
+   of compile errors with exact fixes.
+3. **Design intent:** `docs/superpowers/specs/2026-05-30-portal-naming-service-design.md`.
+4. **Verified runtime facts:** `docs/toolchain.md`.
+5. **Chain endpoints / faucet:** `rpc.md`.
 
-## What works right now
-- `scripts/` (Python `substrate-interface==1.7.4`): `check_connection.py` → CONNECTION OK;
-  `faucet.py` → drips POT (verified live). `chain.py` helpers (connect/alice/new_account).
-- **Docker image `pns-ink-build`** (≈2.5 GB, kept locally) built from
-  `docker/Dockerfile.contracts`: Debian bookworm + nightly-2021-03-01 + wasm target +
-  rust-src + **cargo-contract 0.12.1** + binaryen. `cargo contract new flipper` works and
-  pins ink! 3.0.0-rc3.
-- `contracts/flipper/` — generated ink! rc3 flipper, with `Cargo.toml` deps pinned exactly
-  to `=3.0.0-rc3` (+ `impl-trait-for-tuples = "=0.2.1"`).
+## Verified facts (unchanged)
+- **Chain:** Portaldot, spec 1002, metadata **V13**, rent-era
+  `pallet-contracts` 3.0.0 (`claim_surcharge`, `instantiate_with_code`,
+  **no** storage deposits / Weight V2 / upload_code). Non-EVM. SS58
+  prefix 42. POT, 14 decimals. ExistentialDeposit 1 POT. Mainnet and
+  dev node run the **identical** runtime.
+- **Toolchain:** Rust `nightly-2021-03-01`, ink! `3.0.0-rc3`,
+  cargo-contract `0.12.1`, seal0 ABI, metadata v0. (We **bypass**
+  cargo-contract's `cargo contract build` and call `cargo build`
+  directly — see `BUILD_AND_DEPLOY.md` for why.)
+- **Endpoints / faucet:** `rpc.md`. Dev node persists state between
+  extrinsics but **resets on node restart**.
 
-## The blocker (precisely diagnosed)
-`cargo contract build` runs:
-`cargo build --target=wasm32-unknown-unknown -Zbuild-std -Zbuild-std-features=panic_immediate_abort ...`
-`-Zbuild-std` re-resolves the whole dependency graph against the live crates.io index,
-pulling 2024 crates (`either 1.16.0`, `crossbeam-deque 0.8.6`, `impl-trait-for-tuples 0.2.2`,
-`ink_prelude 3.4.0`…) that require `edition2021` — which rustc 1.52 (nightly-2021-03-01)
-cannot parse. Tried and insufficient: exact `=` pins, `-Z minimal-versions` lockfile
-(correctly pinned `either` to 1.5.0 but build-std ignored the lock), and `cargo vendor` +
-crates-io source-replacement (build-std re-resolution bypassed it).
+## What's deployed (this session)
 
-Earlier dead end: native macOS build is impossible — Xcode 26 / `ld-1230` rejects 2021
-Rust rlibs (`lib.rmeta not a mach-o file`); `-ld_classic` no longer helps. Hence Docker.
+Six PNS contracts, all wired, owner-gated, cross-contract-call working.
+Latest addresses live in `scripts/pns_addresses.json` (re-generated by
+`scripts/deploy_pns.py`; the dApp reads them via `NEXT_PUBLIC_PNS_*`
+env vars in `app/.env.local`).
 
-Update (after ~10 build attempts, all in `docs/toolchain.md`): **disabling build-std is a
-dead end** — ink! contracts are `#![no_std]` and require `-Zbuild-std`; without it the
-precompiled wasm `libstd` links and collides with ink's `panic_impl` (E0152). And
-`-Z minimal-versions` overshoots: it picks too-OLD crates (`void`, `wee_alloc`) that don't
-compile on rustc 1.52, while normal resolution picks too-NEW (edition2021). The dep set
-must be *period-correct* (~mid-2021).
+Wiring (Alice as root owner):
 
-## Options to unblock (pick one)
-1. **Ask fengsong / Portaldot team** for their ink! 3.0.0-rc3 build env (Docker image or
-   cargo cache) or any prebuilt `flipper.contract` + `.wasm`. Fastest, most reliable —
-   **recommended.**
-2. **Freeze the crates.io index to ~2021-04 GLOBALLY** (set `/root/.cargo/config.toml` —
-   not the project — to replace `[source.crates-io]` with
-   `git+https://github.com/rust-lang/crates.io-index?rev=<2021 commit>`) so build-std's own
-   resolution only sees 2021 crates. Correct technical fix; heavy (multi-GB index fetch
-   under x86 emulation) and unverified that cargo-contract honors the global config.
+    Registry.set_subnode_owner(zero32, labelhash("pot"),     PotRegistrar)
+    Registry.set_subnode_owner(zero32, labelhash("reverse"), Alice)
+    Registry.set_subnode_owner(reverse_node, labelhash("addr"), ReverseRegistrar)
+    PotRegistrar.add_controller(RegistrarController)
 
-## Next steps once a contract builds
-Resume Plan 0 at deploy: `scripts/` deploy via `substrate-interface` `ContractCode`
-(`instantiate_with_code`, old u64 `gas_limit`, `endowment`/`value=0`, `upload_code=True`) →
-verify get→flip→get → **cross-contract probe** (the architecture gate for the 5-contract
-design). Then write detailed Plans 1–4 (core contracts → resolver/reverse/subnames → SDK →
-dApp). See `docs/superpowers/plans/2026-05-30-portal-naming-service-roadmap.md`.
+The dev node resets state on restart, so `deploy_pns.py` is
+idempotent and safe to re-run. Salts are bumped each redeploy so
+addresses change but the on-chain graph stays correct.
+
+## Diagnostic wins (these saved hours and are documented for posterity)
+
+1. **Build is unblocked.** HANDOFF option 2 alone wasn't enough (frozen
+   index gets bypassed by `-Zbuild-std`); option 3 alone wasn't
+   workable (cargo-contract hardcodes the flag). Combining them —
+   skip `-Zbuild-std` entirely by calling vanilla `cargo build` AND
+   use the frozen 2021-05-05 crates.io index — works.
+2. **Frozen index needed an orphan-commit rewrite.** Shallow clone has
+   a parent-commit reference libgit2 can't follow when cargo fetches
+   into its registry cache. Recipe in `BUILD_AND_DEPLOY.md`.
+3. **wasm prep pipeline.** pallet-contracts 3.0.0 `prepare.rs` rejects
+   raw `cargo build` output for three reasons — all three diagnosed by
+   reading `prepare.rs` directly off the Portaldot source:
+     - locally-defined memory → `-C link-arg=--import-memory`
+     - imported memory with no max → `-C link-arg=--max-memory=1048576`
+     - exports other than `deploy`/`call` →
+       `scripts/strip_exports.py` (wasm-opt has no `--remove-export`).
+   The unoptimised binary is also too big → `wasm-opt -Oz`.
+4. **Cross-contract call API in rc3.** Required pattern:
+   `build_call::<DefaultEnvironment>().callee(t).gas_limit(0)
+   .transferred_value(0).exec_input(...).returns::<ReturnType<R>>()
+   .fire()` with `ReturnType` imported from
+   `ink_env::call::utils::ReturnType`. The ink! 4.x `Call::new()`
+   pattern does NOT compile in rc3.
+5. **Cross-contract selectors must use the real default rule** —
+   `blake2_256(name)[..4]`. Earlier placeholder selectors
+   (`[0xC0, 0x70, 0x1A, 0x01]`) compiled but would silently no-op at
+   runtime because the receiving contract dispatches on the real
+   default.
+6. **PaymentRecord + ProfileRecord were trimmed** from PublicResolver
+   in v1 — they pushed the wasm above the runtime's CodeTooLarge cap.
+   Easy to add back when the runtime ships with a larger
+   `schedule.limits.code_size`.
+
+## Working conventions (still hold)
+- **Git commits:** plain messages, no `Co-Authored-By: Claude` trailer.
+- **Docker:** don't `open -a Docker` for the user — ask first. Builds
+  run inside `pns-ink-build`. Contracts run on the **remote** dev node,
+  not in any local docker.
+- **Homebrew:** never `brew uninstall`/`autoremove` without explicit
+  per-command consent.
+
+## Project deliverables snapshot
+- **6 ink! 3.0.0-rc3 contracts** (`contracts/`) — Registry, PotRegistrar,
+  RegistrarController, PublicResolver, ReverseRegistrar,
+  SubnameRegistrar. All compile + deploy + pass on-chain conformance.
+- **TS SDK** (`packages/sdk-ts/`) — pure `normalize` / `namehash` /
+  `labelhash` (31 vitest cases), `PnsClient.resolve()` / `.reverse()`
+  with mandatory forward-verification, contract dry-run helpers.
+- **Python SDK** (`packages/sdk-py/`) — same pure functions,
+  byte-identical cross-language conformance vs TS (5 unittest cases).
+- **Next.js dApp** (`app/`) — Resolve + Reverse cards, Tailwind, wired
+  via env vars to the deployed addresses. Builds clean.
+- **Deploy + wire orchestrator** (`scripts/deploy_pns.py`) — deploys
+  all six in dependency order and runs the four wiring extrinsics.
+  Idempotent re-runs use a fresh salt range.
+- **End-to-end harness** (`scripts/test_e2e.py`) — commit-reveal →
+  `.pot` mint → set addr record → forward resolution.
+- **Recipe docs** — `BUILD_AND_DEPLOY.md` (mechanical),
+  `docs/toolchain.md` (verified facts).
+
+## Known limitations / v2 deferred
+- `PaymentRecord` + `ProfileRecord` deferred to v2 (size constraint on
+  current schedule).
+- Premium Dutch-auction post-grace deferred to v2 (per spec §11).
+- Streaming/subscription payments, subname marketplace, USD-peg oracle
+  — all v2 per spec §11.
 
 ## Repo map
-- `docs/superpowers/specs/2026-05-30-portal-naming-service-design.md` — full design spec
-- `docs/superpowers/plans/` — roadmap + detailed Phase 0 plan
-- `docs/toolchain.md` — verified toolchain + build-environment findings
-- `docs/brew-restore-list.md` — list to restore 65 Homebrew formulae removed by an
-  accidental `brew autoremove` during cleanup (run the `brew install` there if tools broke)
-- `rpc.md` — node endpoints, accounts, faucet
-- `scripts/` — Python chain ops (verified working)
-- `docker/Dockerfile.contracts` — the build image
-- `contracts/flipper/` — ink! rc3 flipper (Cargo.toml pinned)
+- `BUILD_AND_DEPLOY.md` — mechanical build + deploy + verify recipe
+- `CLAUDE.md` — stable orientation rules for AI sessions
+- `app/` — Next.js reference dApp (`app/.env.local` for deployed addresses)
+- `contracts/` — six ink! 3.0.0-rc3 contracts
+- `docker/Dockerfile.contracts` + `docker/build-contract.sh` — build env
+- `docs/superpowers/specs/` — full design spec
+- `docs/superpowers/plans/` — roadmap + Phase 0 detail
+- `docs/toolchain.md` — verified runtime + build-environment findings
+- `packages/sdk-ts/` — TypeScript SDK
+- `packages/sdk-py/` — Python SDK
+- `rpc.md` — chain endpoints, accounts, faucet
+- `scripts/` — Python chain ops (deploy, test, fixtures)
+- `scripts/pns_addresses.json` — current deployed addresses
+- `scripts/test_e2e.py` — end-to-end conformance harness

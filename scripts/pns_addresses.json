@@ -1,8 +1,8 @@
 {
-  "registry": "5DHKaqiELnzdTxzBp8c5p4HyKWK1PTDYPYyW92fSoFeedUhk",
-  "pot_registrar": "5DhZdZanBjuH3HEd66kzVAD6tQXbyC27EbYjLwPRHMk3eb3k",
-  "registrar_controller": "5DorzpKAGCZyFtpyUcnM6C85PNFQfLzeEmmeSZzytNBgXoDX",
-  "public_resolver": "5Fq6KbdFbGhu6wbXDLvhViJccvZahMZqVpg6ZZKqADYwLZCE",
-  "reverse_registrar": "5F4v5DQ4fuNj9dxCERKzTTEYLdifmmqUwDmZUnRUrDQajzCs",
-  "subname_registrar": "5FSHvhfWxreMLj2DRaW39PJzUaVASEP4S5s6m4CiSGDurKsR"
+  "registry": "5Gg7tZDAPRUyoouUzeM1oo3K4migHxH31gcgXUqLS1AoErcZ",
+  "pot_registrar": "5CrbQmNr1YcPgjrF2c3pvkHHnnheG6tdKY99feUiy2qXA39c",
+  "registrar_controller": "5D1Pj1T7J6EBGZwfwxHJzRoT3JcC1i4ED2zif7Rh8ZNsignf",
+  "public_resolver": "5EUMJavvFLtDvFtK7JHYfauokoeRcw5kaV8AkEgJuNi7Uiak",
+  "reverse_registrar": "5HhhKUnTgSbk1wbhgmsnnE9QxiKEwL3qR7UGLt5t6wgZikGb",
+  "subname_registrar": "5H7YJVJv9wrzHdAQmy6dqGJTgEBQWbkTx3HhQvgdo3yGdXek"
 }

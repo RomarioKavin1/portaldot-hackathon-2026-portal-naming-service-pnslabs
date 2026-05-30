@@ -143,7 +143,7 @@ mod reverse_registrar {
         }
 
         fn registry_set_subnode_owner(&mut self, label: Label, owner: AccountId) -> Result<Node> {
-            const SEL_SET_SUBNODE_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x01];
+            const SEL_SET_SUBNODE_OWNER: [u8; 4] = [0x55, 0x25, 0x57, 0x50];
             build_call::<DefaultEnvironment>()
                 .callee(self.registry)
                 .gas_limit(0)
@@ -161,7 +161,7 @@ mod reverse_registrar {
         }
 
         fn registry_set_resolver(&mut self, node: Node, resolver: Option<AccountId>) -> Result<()> {
-            const SEL_SET_RESOLVER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x04];
+            const SEL_SET_RESOLVER: [u8; 4] = [0xB7, 0x97, 0xE5, 0x60];
             build_call::<DefaultEnvironment>()
                 .callee(self.registry)
                 .gas_limit(0)
@@ -178,7 +178,7 @@ mod reverse_registrar {
         }
 
         fn resolver_set_name(&mut self, node: Node, name: String) -> Result<()> {
-            const SEL_RESOLVER_SET_NAME: [u8; 4] = [0xC0, 0x70, 0x1A, 0x06];
+            const SEL_RESOLVER_SET_NAME: [u8; 4] = [0x24, 0xD2, 0xDA, 0x30];
             build_call::<DefaultEnvironment>()
                 .callee(self.default_resolver)
                 .gas_limit(0)

@@ -1,7 +1,7 @@
 import { PnsConnection, PnsConfig } from "./connection.js";
 import { namehash } from "./namehash.js";
 import { normalize } from "./normalize.js";
-import { buildCallData, dryRun } from "./contract.js";
+import { buildCallData, defaultSelector, dryRun } from "./contract.js";
 import { TypeRegistry } from "@polkadot/types";
 import { decodeAddress, encodeAddress } from "@polkadot/util-crypto";
 import { u8aToHex } from "@polkadot/util";
@@ -12,6 +12,15 @@ import { u8aToHex } from "@polkadot/util";
  * in rpc.md.
  */
 const ALICE_DEV_ADDR = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
+
+/**
+ * ink! 3.0.0-rc3 default message selectors = blake2_256(name)[..4]. We
+ * pre-compute the ones the client uses so the hot path doesn't hash on
+ * every call. Identical to `scripts/selectors.py`.
+ */
+const SEL_RESOLVER    = defaultSelector("resolver");     // Registry.resolver
+const SEL_ADDR        = defaultSelector("addr");         // PublicResolver.addr
+const SEL_NAME        = defaultSelector("name");         // PublicResolver.name
 
 /** SLIP-0044-style id reserved for the native Portaldot SS58 address. */
 export const COIN_POT = 0xffff_0000;
@@ -108,12 +117,7 @@ export class PnsClient {
 
   /** Registry.resolver(node) -> Option<AccountId>. */
   private async registryResolver(registry: string, node: Uint8Array): Promise<string | null> {
-    const data = buildCallData(
-      // Selector matches Registry's explicit `SEL_RESOLVER` literal once we
-      // set it on the contract side. Current default is hardcoded.
-      "0xC0701A03",
-      node,
-    );
+    const data = buildCallData(SEL_RESOLVER, node);
     const out = await dryRun(this.conn.api, ALICE_DEV_ADDR, registry, data);
     // SCALE-decode Option<AccountId32>. Option byte 0 = None, 1 = Some(32).
     if (out.length === 0 || out[0] === 0) return null;
@@ -123,13 +127,16 @@ export class PnsClient {
 
   /** PublicResolver.addr(node, coin_type) -> Option<Vec<u8>>. */
   private async resolverAddr(resolver: string, node: Uint8Array, coinType: number): Promise<string | null> {
-    const reg = new TypeRegistry();
-    const args = reg.createType("(([u8; 32], u32))", [node, coinType] as any).toU8a();
-    const data = buildCallData("0xC0701A04", args);
+    // ink! 3.0.0-rc3 encodes args sequentially with no tuple wrapper:
+    // selector(4) + node(32 raw) + coin_type(4 LE).
+    const args = new Uint8Array(32 + 4);
+    args.set(node, 0);
+    new DataView(args.buffer).setUint32(32, coinType, true);
+    const data = buildCallData(SEL_ADDR, args);
     const out = await dryRun(this.conn.api, ALICE_DEV_ADDR, resolver, data);
-    // Option<Vec<u8>>: 0 = None; 1 + Compact<u32> + bytes.
     if (out.length === 0 || out[0] === 0) return null;
-    // For COIN_POT, raw bytes = AccountId32 pubkey.
+    // For COIN_POT we know the value bytes are an SS58 pubkey (32 bytes).
+    const reg = new TypeRegistry();
     const vec = reg.createType("Vec<u8>", out.slice(1));
     const bytes = vec.toU8a(true);
     if (bytes.length === 32) return encodeAddress(bytes, this.conn.ss58Format);
@@ -138,7 +145,7 @@ export class PnsClient {
 
   /** PublicResolver.name(node) -> Option<String>. */
   private async resolverName(resolver: string, node: Uint8Array): Promise<string | null> {
-    const data = buildCallData("0xC0701A05", node);
+    const data = buildCallData(SEL_NAME, node);
     const out = await dryRun(this.conn.api, ALICE_DEV_ADDR, resolver, data);
     if (out.length === 0 || out[0] === 0) return null;
     const reg = new TypeRegistry();

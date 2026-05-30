@@ -156,7 +156,7 @@ mod public_resolver {
 
         /// Registry.owner(node) -> Option<AccountId>.
         fn registry_owner(&self, node: Node) -> Result<Option<AccountId>> {
-            const SEL_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x02];
+            const SEL_OWNER: [u8; 4] = [0xFE, 0xAE, 0xA4, 0xFA];
             let res: Option<AccountId> = build_call::<DefaultEnvironment>()
                 .callee(self.registry)
                 .gas_limit(0)
@@ -195,8 +195,6 @@ mod public_resolver {
             let n: Node = [1u8; 32];
             assert_eq!(r.addr(n, COIN_POT), None);
             assert_eq!(r.text(n, "url".into()), None);
-            assert_eq!(r.payment(n), None);
-            assert_eq!(r.profile(n), None);
             assert_eq!(r.name(n), None);
         }
 

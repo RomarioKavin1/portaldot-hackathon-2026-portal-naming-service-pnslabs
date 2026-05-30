@@ -113,13 +113,13 @@ def main():
     addrs = {}
 
     # ---- 1. Registry --------------------------------------------------
-    registry_addr = deploy_wasm("registry", constructor="new", salt=b"\xB0")
+    registry_addr = deploy_wasm("registry", constructor="new", salt=b"\xC0")
     addrs["registry"] = registry_addr
 
     # ---- 2. PotRegistrar(registry, pot_node) -------------------------
     args = encode_account(s, registry_addr) + encode_node(pot_node)
     pot_registrar_addr = deploy_wasm(
-        "pot_registrar", constructor="new", salt=b"\xB1",
+        "pot_registrar", constructor="new", salt=b"\xC1",
         args_encoded=args,
     )
     addrs["pot_registrar"] = pot_registrar_addr
@@ -128,7 +128,7 @@ def main():
     args = (encode_account(s, pot_registrar_addr)
             + encode_account(s, alice_addr))
     controller_addr = deploy_wasm(
-        "registrar_controller", constructor="new", salt=b"\xB2",
+        "registrar_controller", constructor="new", salt=b"\xC2",
         args_encoded=args,
     )
     addrs["registrar_controller"] = controller_addr
@@ -136,7 +136,7 @@ def main():
     # ---- 4. PublicResolver(registry) ---------------------------------
     args = encode_account(s, registry_addr)
     resolver_addr = deploy_wasm(
-        "public_resolver", constructor="new", salt=b"\xB3",
+        "public_resolver", constructor="new", salt=b"\xC3",
         args_encoded=args,
     )
     addrs["public_resolver"] = resolver_addr
@@ -146,7 +146,7 @@ def main():
             + encode_account(s, resolver_addr)
             + encode_node(addr_reverse_node))
     reverse_addr = deploy_wasm(
-        "reverse_registrar", constructor="new", salt=b"\xB4",
+        "reverse_registrar", constructor="new", salt=b"\xC4",
         args_encoded=args,
     )
     addrs["reverse_registrar"] = reverse_addr
@@ -154,7 +154,7 @@ def main():
     # ---- 6. SubnameRegistrar(registry) -------------------------------
     args = encode_account(s, registry_addr)
     subname_addr = deploy_wasm(
-        "subname_registrar", constructor="new", salt=b"\xB5",
+        "subname_registrar", constructor="new", salt=b"\xC5",
         args_encoded=args,
     )
     addrs["subname_registrar"] = subname_addr

@@ -171,7 +171,7 @@ mod subname_registrar {
         // ===== helpers =====
 
         fn registry_owner(&self, node: Node) -> Result<Option<AccountId>> {
-            const SEL_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x02];
+            const SEL_OWNER: [u8; 4] = [0xFE, 0xAE, 0xA4, 0xFA];
             build_call::<DefaultEnvironment>()
                 .callee(self.registry)
                 .gas_limit(0)
@@ -188,7 +188,7 @@ mod subname_registrar {
         fn registry_set_subnode_owner(
             &mut self, parent: Node, label: Label, owner: AccountId,
         ) -> Result<Node> {
-            const SEL_SET_SUBNODE_OWNER: [u8; 4] = [0xC0, 0x70, 0x1A, 0x01];
+            const SEL_SET_SUBNODE_OWNER: [u8; 4] = [0x55, 0x25, 0x57, 0x50];
             build_call::<DefaultEnvironment>()
                 .callee(self.registry)
                 .gas_limit(0)
