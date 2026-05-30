@@ -18,7 +18,7 @@
     "@privy-io/react-auth": "^3.28.0",
     "lenis": "^1.3.23",
     "next": "^14.2.0",
-    "portaldot-pns": "workspace:*",
+    "portaldot-pns": "^0.1.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },
