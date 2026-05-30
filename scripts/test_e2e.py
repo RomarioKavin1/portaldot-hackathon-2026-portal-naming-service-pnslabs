@@ -161,10 +161,46 @@ def main():
     print("6. PublicResolver.addr(alice.pot, COIN_POT)  [forward resolution]")
     args = alice_pot_node + COIN_POT.to_bytes(4, "little")
     out = dry(s, alice_addr, addrs["public_resolver"], "addr", args)
-    # Option<Vec<u8>>: 0x01 + compact-len + bytes
     expect("Some(Vec(alice_pubkey))",
            out, b"\x01" + bytes([32 << 2]) + alice_pubkey)
     print(f"    resolve('alice.pot') -> {alice_addr}\n")
+
+    # 7. Reverse path. We DO NOT route through ReverseRegistrar.set_name()
+    # because that cross-calls PublicResolver.set_name() from the registrar
+    # — but the resolver gates writes on the *caller* owning the node, and
+    # claim() just handed ownership of the reverse subnode to alice. So
+    # alice writes the records herself directly, which is the same shape
+    # the SDK's reverse() flow expects to read.
+    print("7. ReverseRegistrar.claim()  [mint <hex(alice)>.addr.reverse to alice]")
+    call(s, kp, addrs["reverse_registrar"], "claim", b"")
+    print("    ✓")
+
+    print("8. Alice owns the reverse node; wires resolver + writes name record.")
+    alice_hex = alice_pubkey.hex().lower().encode()
+    reverse_label = blake2_256(alice_hex)
+    addr_reverse_node = namehash("addr.reverse")
+    alice_reverse_node = blake2_256(addr_reverse_node + reverse_label)
+    print(f"    alice.addr.reverse node = 0x{alice_reverse_node.hex()}")
+
+    print("8a. Registry.set_resolver(alice.addr.reverse, PublicResolver)")
+    call(s, kp, addrs["registry"], "set_resolver",
+         alice_reverse_node + b"\x01" + resolver_pubkey)
+    print("    ✓")
+
+    print('8b. PublicResolver.set_name(alice.addr.reverse, "alice.pot")')
+    name_str = "alice.pot"
+    name_bytes = name_str.encode()
+    name_scale = bytes([len(name_bytes) << 2]) + name_bytes
+    call(s, kp, addrs["public_resolver"], "set_name",
+         alice_reverse_node + name_scale)
+    print("    ✓\n")
+
+    print("9. PublicResolver.name(alice.addr.reverse) -> 'alice.pot'  [reverse]")
+    out = dry(s, alice_addr, addrs["public_resolver"], "name",
+              alice_reverse_node)
+    expected = b"\x01" + name_scale
+    expect("Some(\"alice.pot\")", out, expected)
+    print(f"    reverse({alice_addr[:8]}…) -> alice.pot\n")
 
     print("ALL CHECKS PASS ✅")
     s.close()

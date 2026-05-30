@@ -18,7 +18,12 @@ for the design spec.
   `app/.env.local` to the deployed addresses.
 - **End-to-end Python harness** (`scripts/test_e2e.py`) exercises the
   full registration flow: commit-reveal → `.pot` mint → set addr record
-  → forward resolution.
+  → forward resolution → ReverseRegistrar.claim → set name → reverse
+  resolution with forward-verification.
+- **New-name CLI** (`scripts/create_name.py <name> [//URI]`) registers
+  any `<name>.pot` to any signable account and wires the addr record so
+  `resolve(<name>.pot)` returns the owner in the dApp immediately.
+  Verified: `bob.pot -> //Bob`, `alice.pot -> //Alice`.
 - **The build pipeline is finally working.** ink! 3.0.0-rc3 compiles
   under nightly-2021-03-01 in the `pns-ink-build` Docker image with the
   frozen 2021-05-05 crates.io-index mirror + RUSTFLAGS
@@ -100,6 +105,26 @@ addresses change but the on-chain graph stays correct.
    in v1 — they pushed the wasm above the runtime's CodeTooLarge cap.
    Easy to add back when the runtime ships with a larger
    `schedule.limits.code_size`.
+7. **Three SDK-side bugs found by running the dApp end-to-end** and
+   diagnosing in the browser console / via `npx tsx
+   packages/sdk-ts/test/resolve-live.ts`:
+     - `@polkadot/api v16`'s `api.rpc.contracts.call()` wrapper injects
+       a `storageDepositLimit` field that Substrate 3.0.0's
+       `contracts_call` RPC rejects with `-32602 Invalid params`.
+       Fix: bypass via `provider.send("contracts_call", [params])`.
+     - That RPC's `value` / `gasLimit` are `NumberOrHex` — must be sent
+       as `"0x" + n.toString(16)`, not decimal strings.
+     - pallet-contracts 3.0.0 charges per-block storage rent against
+       the contract's own balance. With the default 10 POT endowment,
+       contracts run out within minutes once they hold storage and
+       reads start failing with `RentNotPaid` (even dry-runs!).
+       `deploy_pns.py` now tops each contract up by 100 POT immediately
+       after wiring; manual rescue is `Balances.transfer(dest=ctr,
+       value=100 * PLANCK)`.
+8. **`packages/sdk-ts/dist/` MUST be rebuilt** whenever client.ts /
+   contract.ts change — Next loads from `dist/` (per package.json
+   `main`), not source. `pnpm -F @portal-name/sdk build` + restart the
+   dev server with `app/.next` purged.
 
 ## Working conventions (still hold)
 - **Git commits:** plain messages, no `Co-Authored-By: Claude` trailer.
