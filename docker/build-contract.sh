@@ -10,10 +10,25 @@ INDEX_HOST="${INDEX_HOST:-$HOME/crates-io-mirror/crates.io-index}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 if [ ! -d "$INDEX_HOST" ]; then
-  echo "frozen index not found at $INDEX_HOST" >&2
-  echo "clone with:" >&2
-  echo "  git clone --branch snapshot-2021-05-05 --single-branch --depth 1 \\" >&2
-  echo "    https://github.com/rust-lang/crates.io-index-archive.git $INDEX_HOST" >&2
+  cat >&2 <<EOF
+frozen index not found at $INDEX_HOST
+Clone + orphan-ize the snapshot so libgit2 can fetch from it:
+
+  git clone --branch snapshot-2021-05-05 --single-branch --depth 1 \\
+    https://github.com/rust-lang/crates.io-index-archive.git "$INDEX_HOST"
+  cd "$INDEX_HOST"
+  TREE=\$(git rev-parse HEAD^{tree})
+  NEW=\$(git commit-tree "\$TREE" -m "snapshot 2021-05-05 (orphan)")
+  git update-ref refs/heads/snapshot-2021-05-05 "\$NEW"
+  git update-ref refs/heads/master "\$NEW"
+  git symbolic-ref HEAD refs/heads/snapshot-2021-05-05
+  git update-ref HEAD "\$NEW"
+  rm -f .git/shallow && git gc --prune=now
+
+(The orphan rewrite is required because a shallow clone references a
+parent commit object that isn't downloaded, which libgit2's fetch into
+the cargo registry cache cannot traverse.)
+EOF
   exit 1
 fi
 
@@ -25,6 +40,5 @@ fi
 docker run --rm --platform=linux/amd64 \
   -v "$REPO_ROOT":/work \
   -v "$INDEX_HOST":/mirror/crates.io-index:ro \
-  -e CARGO_NET_OFFLINE=false \
   pns-ink-build \
   bash -lc "cd /work/contracts/$CONTRACT && cargo +nightly-2021-03-01 contract build"
