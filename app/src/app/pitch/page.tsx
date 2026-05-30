@@ -8,18 +8,13 @@ import {
   Dashes,
   KeyDoodle,
   LockDoodle,
-  LoopArrow,
   MagnifierDoodle,
   NameTag,
   ScribbleUnderline,
   ShieldDoodle,
   SignpostDoodle,
   SketchDefs,
-  Sparkle,
-  StarDoodle,
-  Ticks,
   TreeDoodle,
-  VaultDoodle,
   WalletDoodle,
 } from "@/components/doodles";
 import { Eyebrow } from "@/components/ui";
@@ -342,47 +337,11 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* Decorative floating doodle anchored at a viewport corner / edge. */
-function Float({
-  children,
-  pos,
-  rot = 0,
-  opacity = 1,
-  z = 1,
-}: {
-  children: React.ReactNode;
-  pos: React.CSSProperties;
-  rot?: number;
-  opacity?: number;
-  z?: number;
-}) {
-  return (
-    <div
-      aria-hidden
-      className="floaty"
-      style={{
-        position: "absolute",
-        ...pos,
-        opacity,
-        zIndex: z,
-        ['--rot' as never]: `${rot}deg`,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 /* ---- slides ---- */
 
 function Title() {
   return (
     <Section id="title" bg="card-blush">
-      <Float pos={{ left: "4%", top: "12%" }} rot={-8}><Sparkle size={36} /></Float>
-      <Float pos={{ right: "8%", top: "16%" }} rot={12}><StarDoodle size={32} /></Float>
-      <Float pos={{ left: "10%", bottom: "10%" }} rot={6}><Ticks size={44} /></Float>
-      <Float pos={{ right: "26%", bottom: "8%" }} rot={-4} opacity={0.85}><CoinDoodle size={70} /></Float>
-
       <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 50, alignItems: "center" }}>
         <div>
           <Reveal>
@@ -425,9 +384,6 @@ function Title() {
 function Problem() {
   return (
     <Section id="problem" bg="card-peach">
-      <Float pos={{ right: "6%", top: "12%" }} rot={10}><MagnifierDoodle size={84} /></Float>
-      <Float pos={{ left: "8%", bottom: "12%" }} rot={-6}><Ticks size={40} /></Float>
-
       <SectionEyebrow>The problem</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 26px", maxWidth: 900 }}>
@@ -467,9 +423,6 @@ function Problem() {
           >
             48 characters. One typo sends funds to the void. You cannot read it, remember it, or trust it at a glance.
           </div>
-          <div aria-hidden style={{ position: "absolute", right: -22, top: -22 }} className="floaty">
-            <Sparkle size={30} />
-          </div>
         </div>
       </Reveal>
       <div className="row gap-22" style={{ marginTop: 30, flexWrap: "wrap" }}>
@@ -490,10 +443,6 @@ function Problem() {
 function Solution() {
   return (
     <Section id="solution" bg="card-mint">
-      <Float pos={{ left: "5%", top: "10%" }} rot={-6} opacity={0.9}><SignpostDoodle size={88} /></Float>
-      <Float pos={{ right: "6%", bottom: "14%" }} rot={10}><Sparkle size={34} /></Float>
-      <Float pos={{ left: "12%", bottom: "8%" }} rot={4}><StarDoodle size={28} /></Float>
-
       <SectionEyebrow>The solution</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,78px)", margin: "0 0 22px", maxWidth: 900 }}>
@@ -524,10 +473,6 @@ function Solution() {
 function WhyNow() {
   return (
     <Section id="why-now" bg="card-blush">
-      <Float pos={{ right: "6%", top: "12%" }} rot={-8}><LoopArrow size={70} /></Float>
-      <Float pos={{ left: "6%", bottom: "10%" }} rot={6}><VaultDoodle size={110} /></Float>
-      <Float pos={{ right: "18%", bottom: "10%" }} rot={4}><Sparkle size={30} /></Float>
-
       <SectionEyebrow>Why now</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 26px", maxWidth: 900 }}>
@@ -574,10 +519,6 @@ function Market() {
   ];
   return (
     <Section id="market" bg="card-mint">
-      <Float pos={{ right: "5%", top: "14%" }} rot={6}><CoinStack size={100} /></Float>
-      <Float pos={{ left: "6%", top: "10%" }} rot={-6}><Ticks size={36} /></Float>
-      <Float pos={{ left: "10%", bottom: "10%" }} rot={4}><StarDoodle size={28} /></Float>
-
       <SectionEyebrow>Market</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 22px", maxWidth: 900 }}>
@@ -617,10 +558,6 @@ function Market() {
 function Product() {
   return (
     <Section id="product" bg="card-peach">
-      <Float pos={{ right: "6%", top: "10%" }} rot={6}><MagnifierDoodle size={94} /></Float>
-      <Float pos={{ left: "6%", bottom: "12%" }} rot={-6}><Sparkle size={32} /></Float>
-      <Float pos={{ right: "20%", bottom: "12%" }} rot={8}><Ticks size={32} /></Float>
-
       <SectionEyebrow>Product · live today</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 22px", maxWidth: 900 }}>
@@ -676,16 +613,13 @@ function Product() {
 }
 
 function Traction() {
-  const stats: [string, string, React.ReactNode][] = [
-    ["6", "ink! contracts deployed & wired on testnet", <Sparkle size={26} key="s" />],
-    ["1", "working dApp — mint, resolve, reverse, subnames", <StarDoodle size={26} key="st" />],
-    ["0→1", "first naming service ever on Portaldot", <Ticks size={26} key="t" />],
+  const stats: [string, string][] = [
+    ["6", "ink! contracts deployed & wired on testnet"],
+    ["1", "working dApp — mint, resolve, reverse, subnames"],
+    ["0→1", "first naming service ever on Portaldot"],
   ];
   return (
     <Section id="traction" bg="card-mint">
-      <Float pos={{ left: "5%", top: "12%" }} rot={-8}><KeyDoodle size={90} /></Float>
-      <Float pos={{ right: "7%", bottom: "14%" }} rot={6}><CoinStack size={88} /></Float>
-
       <SectionEyebrow>Traction</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 26px", maxWidth: 900 }}>
@@ -693,7 +627,7 @@ function Traction() {
         </h2>
       </Reveal>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 20 }}>
-        {stats.map(([n, l, dec], i) => (
+        {stats.map(([n, l], i) => (
           <Reveal key={l} delay={i * 100}>
             <div
               className="card card-paper"
@@ -701,11 +635,8 @@ function Traction() {
                 padding: "26px 24px",
                 textAlign: "center",
                 border: "1.5px solid var(--line)",
-                position: "relative",
-                overflow: "hidden",
               }}
             >
-              <div style={{ position: "absolute", right: 14, top: 14 }}>{dec}</div>
               <div className="display" style={{ fontSize: 64 }}>{n}</div>
               <p className="body-txt" style={{ fontSize: 14, marginTop: 8 }}>{l}</p>
             </div>
@@ -730,10 +661,6 @@ function Model() {
   ];
   return (
     <Section id="model" bg="card-peach">
-      <Float pos={{ right: "6%", top: "14%" }} rot={-6}><CoinDoodle size={90} /></Float>
-      <Float pos={{ left: "5%", bottom: "12%" }} rot={6}><CoinStack size={92} /></Float>
-      <Float pos={{ right: "20%", bottom: "8%" }} rot={4}><Sparkle size={28} /></Float>
-
       <SectionEyebrow>Business model</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 22px", maxWidth: 900 }}>
@@ -750,13 +677,8 @@ function Model() {
           <Reveal key={len} delay={i * 80}>
             <div
               className="card card-paper"
-              style={{ padding: "20px 20px 22px", border: "1.5px solid var(--line)", position: "relative" }}
+              style={{ padding: "20px 20px 22px", border: "1.5px solid var(--line)" }}
             >
-              {i === 3 && (
-                <div style={{ position: "absolute", right: 10, top: 10 }}>
-                  <StarDoodle size={22} fill="#1A1714" color="#1A1714" />
-                </div>
-              )}
               <div className="body-txt" style={{ fontSize: 13 }}>{len}</div>
               <div className="display" style={{ fontSize: 40, margin: "6px 0 2px" }}>{price}</div>
               <div className="mono" style={{ fontSize: 11, color: "var(--ink-soft)" }}>POT / year</div>
@@ -772,9 +694,6 @@ function Model() {
 function Competition() {
   return (
     <Section id="competition" bg="card-blush">
-      <Float pos={{ right: "6%", top: "14%" }} rot={-6}><ShieldDoodle size={92} accent="#FBFAF8" /></Float>
-      <Float pos={{ left: "5%", bottom: "12%" }} rot={6}><KeyDoodle size={90} /></Float>
-
       <SectionEyebrow>Why we win</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(40px,5.5vw,76px)", margin: "0 0 26px", maxWidth: 900 }}>
@@ -799,12 +718,8 @@ function Competition() {
               padding: "26px 28px",
               border: "2px solid var(--ink)",
               boxShadow: "0 24px 50px -22px rgba(40,30,25,0.45)",
-              position: "relative",
             }}
           >
-            <div aria-hidden style={{ position: "absolute", right: -16, top: -16 }} className="floaty">
-              <Sparkle size={28} />
-            </div>
             <Eyebrow>PNS</Eyebrow>
             <ul
               style={{
@@ -836,10 +751,6 @@ function Competition() {
 function Team() {
   return (
     <Section id="team" bg="card-mint">
-      <Float pos={{ right: "6%", top: "12%" }} rot={-6}><WalletDoodle size={100} /></Float>
-      <Float pos={{ left: "6%", bottom: "10%" }} rot={6}><TreeDoodle size={90} /></Float>
-      <Float pos={{ right: "20%", bottom: "12%" }} rot={4}><Ticks size={28} /></Float>
-
       <SectionEyebrow>Team</SectionEyebrow>
       <Reveal>
         <h2 className="display" style={{ fontSize: "clamp(48px,7vw,98px)", margin: "0 0 22px" }}>pnslabs</h2>
@@ -882,11 +793,6 @@ function Team() {
 function Ask() {
   return (
     <Section id="ask" bg="card-peach">
-      <Float pos={{ left: "8%", top: "12%" }} rot={-8}><Sparkle size={48} /></Float>
-      <Float pos={{ right: "10%", top: "10%" }} rot={10}><StarDoodle size={42} /></Float>
-      <Float pos={{ left: "12%", bottom: "10%" }} rot={6}><Ticks size={40} /></Float>
-      <Float pos={{ right: "8%", bottom: "12%" }} rot={-4}><KeyDoodle size={120} /></Float>
-
       <div style={{ textAlign: "center", position: "relative" }}>
         <Reveal>
           <Eyebrow>The ask</Eyebrow>

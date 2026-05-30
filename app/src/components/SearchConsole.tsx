@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { tryNormalize } from "portaldot-pns";
 import { useNetwork } from "@/lib/network-context";
@@ -352,15 +352,34 @@ function RegisterPipeline({
   const { wallet, address, signMessage } = useSubstrateAccount();
   const [stepIdx, setStepIdx] = useState(0);
   const [done, setDone] = useState<number[]>([]);
-  const [funded, setFunded] = useState(false);
   const [fundError, setFundError] = useState<string | null>(null);
   const [mintError, setMintError] = useState<string | null>(null);
   const [phase, setPhase] = useState<"funding" | "minting" | "done">("funding");
 
-  // Auto-fund then mint.
+  // Refs hold the latest unstable callbacks/values without triggering re-runs.
+  const signMessageRef = useRef(signMessage);
+  const getClientRef = useRef(getClient);
+  const netRef = useRef(net);
+  const onMintedRef = useRef(onMinted);
+  useEffect(() => {
+    signMessageRef.current = signMessage;
+    getClientRef.current = getClient;
+    netRef.current = net;
+    onMintedRef.current = onMinted;
+  });
+
+  // Guard so the mint flow runs exactly ONCE per pipeline mount, even though
+  // React 18 strict mode double-mounts and unstable deps re-fire effects. The
+  // faucet has its own server-side rate limit, but spamming it from the client
+  // is wrong regardless.
+  const startedRef = useRef(false);
+
   useEffect(() => {
     if (!address || !wallet) return;
+    if (startedRef.current) return;
+    startedRef.current = true;
     let cancelled = false;
+
     (async () => {
       setFundError(null);
       const r = await requestFaucet(address);
@@ -369,27 +388,32 @@ function RegisterPipeline({
         setFundError(r.error);
         return;
       }
-      setFunded(true);
       setPhase("minting");
       try {
-        const client = await getClient();
+        const client = await getClientRef.current();
         const api = client.connection.api;
-        const signer = createPrivySigner(api, wallet, signMessage);
+        const signer = createPrivySigner(api, wallet, signMessageRef.current);
         await registerName({
           api,
           signer,
           fromAddress: address,
-          controller: net.contracts.registrarController,
-          registry: net.contracts.registry,
-          resolver: net.contracts.publicResolver,
+          controller: netRef.current.contracts.registrarController,
+          registry: netRef.current.contracts.registry,
+          resolver: netRef.current.contracts.publicResolver,
           rawName: label,
           onStep: (s) => {
             if (cancelled) return;
-            const idx = /commit/i.test(s) ? 0 : /register/i.test(s) ? 1 : /wiring/i.test(s) ? 2 : /publishing/i.test(s) ? 3 : null;
+            const idx = /commit/i.test(s)
+              ? 0
+              : /register/i.test(s)
+                ? 1
+                : /wiring/i.test(s)
+                  ? 2
+                  : /publishing/i.test(s)
+                    ? 3
+                    : null;
             if (idx === null) return;
             setStepIdx(idx);
-            setDone((d) => (d[d.length - 1] >= idx - 1 ? d : d));
-            // mark previous steps as done
             setDone((d) => {
               const all = new Set(d);
               for (let i = 0; i < idx; i++) all.add(i);
@@ -402,15 +426,19 @@ function RegisterPipeline({
         setStepIdx(3);
         setPhase("done");
         addOwnedName(address, `${label}.pot`);
-        onMinted(address);
+        onMintedRef.current(address);
       } catch (e: unknown) {
         if (!cancelled) setMintError(e instanceof Error ? e.message : String(e));
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [address, wallet, signMessage, getClient, net, label, onMinted]);
+    // Only re-run if the *identity* of the mint target changes (different
+    // wallet / address / label). Stable callbacks live in refs above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, wallet, label]);
 
   return (
     <div style={{ marginTop: 22, display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 22 }} className="pop-in">
