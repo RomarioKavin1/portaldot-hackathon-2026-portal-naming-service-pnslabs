@@ -49,14 +49,22 @@ crates-io source-replacement (build-std re-resolution bypassed it).
 Earlier dead end: native macOS build is impossible — Xcode 26 / `ld-1230` rejects 2021
 Rust rlibs (`lib.rmeta not a mach-o file`); `-ld_classic` no longer helps. Hence Docker.
 
+Update (after ~10 build attempts, all in `docs/toolchain.md`): **disabling build-std is a
+dead end** — ink! contracts are `#![no_std]` and require `-Zbuild-std`; without it the
+precompiled wasm `libstd` links and collides with ink's `panic_impl` (E0152). And
+`-Z minimal-versions` overshoots: it picks too-OLD crates (`void`, `wee_alloc`) that don't
+compile on rustc 1.52, while normal resolution picks too-NEW (edition2021). The dep set
+must be *period-correct* (~mid-2021).
+
 ## Options to unblock (pick one)
 1. **Ask fengsong / Portaldot team** for their ink! 3.0.0-rc3 build env (Docker image or
-   cargo cache) or any prebuilt `flipper.contract` + `.wasm`. Fastest, most reliable.
-2. **Freeze the crates.io index to ~2021-05** (replace `[source.crates-io]` with a
-   crates.io-index git checkout at a 2021 commit) so build-std also only sees 2021 crates.
-   Correct technical fix; heavy (multi-GB index, x86 emulation).
-3. **Disable build-std** (build the contract against the precompiled wasm32 std) if
-   cargo-contract 0.12 / ink! rc3 can be coaxed to — would stop the re-resolution.
+   cargo cache) or any prebuilt `flipper.contract` + `.wasm`. Fastest, most reliable —
+   **recommended.**
+2. **Freeze the crates.io index to ~2021-04 GLOBALLY** (set `/root/.cargo/config.toml` —
+   not the project — to replace `[source.crates-io]` with
+   `git+https://github.com/rust-lang/crates.io-index?rev=<2021 commit>`) so build-std's own
+   resolution only sees 2021 crates. Correct technical fix; heavy (multi-GB index fetch
+   under x86 emulation) and unverified that cargo-contract honors the global config.
 
 ## Next steps once a contract builds
 Resume Plan 0 at deploy: `scripts/` deploy via `substrate-interface` `ContractCode`

@@ -17,6 +17,9 @@ ink_prelude = { version = "=3.0.0-rc3", default-features = false }
 ink_allocator = { version = "=3.0.0-rc3", default-features = false }
 # Non-ink transitives whose newer releases require edition2021 (rustc 1.52 can't build):
 impl-trait-for-tuples = "=0.2.1"
+# Crates where -Z minimal-versions picks a too-OLD broken version; bump to last good:
+void = "=1.0.2"
+wee_alloc = "=0.4.5"
 
 scale = { package = "parity-scale-codec", version = "2.1", default-features = false, features = ["derive"] }
 scale-info = { version = "0.6.0", default-features = false, features = ["derive"], optional = true }
