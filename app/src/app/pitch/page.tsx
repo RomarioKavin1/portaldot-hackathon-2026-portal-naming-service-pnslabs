@@ -1,590 +1,652 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { SmoothScroll } from "@/components/SmoothScroll";
 
-/* ──────────────────────────────────────────────────────────────────────── */
-/* Pitch deck — 7 slides, keyboard-navigable.                                */
-/* Arrows / Space / PageUp/Down to navigate. G/Home/End to jump. Esc → /.    */
-/* Built from /pitch/SCRIPT.md + SLIDES.md + ASK.md (3-min hackathon arc).   */
-/* ──────────────────────────────────────────────────────────────────────── */
+/* ------------------------------------------------------------------ *
+ * PNS investor pitch — a single smooth-scrolling page.
+ *
+ * Structure follows the YC / Sequoia sequence (Problem → Solution → Why
+ * Now → Market → Product → Traction → Model → Competition → Team → Ask).
+ * Lenis (see SmoothScroll) drives the inertial scroll; each section reveals
+ * on intersection, and the right-rail dots scrollTo through the Lenis
+ * instance so the nav respects the same smoothing.
+ * ------------------------------------------------------------------ */
 
-const SLIDES: { id: string; render: () => React.ReactNode }[] = [
-  { id: "title", render: TitleSlide },
-  { id: "problem", render: ProblemSlide },
-  { id: "solution", render: SolutionSlide },
-  { id: "demo", render: DemoSlide },
-  { id: "scale", render: ScaleSlide },
-  { id: "business", render: BusinessSlide },
-  { id: "ask", render: AskSlide },
-];
+const SLIDES = [
+  { id: "title", label: "PNS" },
+  { id: "problem", label: "Problem" },
+  { id: "solution", label: "Solution" },
+  { id: "why-now", label: "Why now" },
+  { id: "market", label: "Market" },
+  { id: "product", label: "Product" },
+  { id: "traction", label: "Traction" },
+  { id: "model", label: "Model" },
+  { id: "competition", label: "Edge" },
+  { id: "team", label: "Team" },
+  { id: "ask", label: "Ask" },
+] as const;
 
-const TOTAL = SLIDES.length;
-
-export default function Pitch() {
-  const [i, setI] = useState(0);
-
-  const go = useCallback((next: number) => {
-    setI((cur) => {
-      if (next < 0) return 0;
-      if (next >= TOTAL) return TOTAL - 1;
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case "ArrowRight":
-        case "ArrowDown":
-        case "PageDown":
-        case " ":
-          e.preventDefault();
-          setI((c) => Math.min(c + 1, TOTAL - 1));
-          break;
-        case "ArrowLeft":
-        case "ArrowUp":
-        case "PageUp":
-          e.preventDefault();
-          setI((c) => Math.max(c - 1, 0));
-          break;
-        case "Home":
-        case "g":
-          setI(0);
-          break;
-        case "End":
-        case "G":
-          setI(TOTAL - 1);
-          break;
-        case "Escape":
-          window.location.href = "/";
-          break;
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const slide = SLIDES[i];
-
+export default function PitchPage() {
   return (
-    <div className="fixed inset-0 flex flex-col overflow-hidden bg-paper text-ink">
-      {/* Slide stage */}
-      <main key={slide.id} className="pns-rise flex flex-1 items-center justify-center px-8 sm:px-14">
-        <div className="w-full max-w-6xl">{slide.render()}</div>
+    <SmoothScroll>
+      <Progress />
+      <RailNav />
+      <main className="relative">
+        <Title />
+        <Problem />
+        <Solution />
+        <WhyNow />
+        <Market />
+        <Product />
+        <Traction />
+        <Model />
+        <Competition />
+        <Team />
+        <Ask />
       </main>
+    </SmoothScroll>
+  );
+}
 
-      {/* Chrome — counter, dots, controls, hint */}
-      <footer className="flex items-center justify-between gap-6 border-t border-line bg-surface/40 px-6 py-3.5 text-xs text-ink-faint backdrop-blur">
-        <div className="flex items-center gap-3 font-mono">
-          <Link href="/" className="text-ink-soft transition-colors hover:text-ink">
-            pns<span className="text-accent-ink">.pot</span>
-          </Link>
-          <span className="text-line-strong">·</span>
-          <span>
-            {String(i + 1).padStart(2, "0")} / {String(TOTAL).padStart(2, "0")}
-          </span>
-        </div>
+/* ------------------------------- chrome ------------------------------- */
 
-        <ProgressDots i={i} onJump={go} />
-
-        <div className="hidden items-center gap-3 sm:flex">
-          <NavBtn onClick={() => go(i - 1)} disabled={i === 0} label="prev" arrow="←" />
-          <NavBtn onClick={() => go(i + 1)} disabled={i === TOTAL - 1} label="next" arrow="→" />
-          <span className="ml-3 hidden font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint lg:inline">
-            ← → · space · esc
-          </span>
-        </div>
-      </footer>
+/** Thin top progress bar tracking page scroll. */
+function Progress() {
+  const [p, setP] = useState(0);
+  useEffect(() => {
+    const onScroll = () => {
+      const h = document.documentElement;
+      const max = h.scrollHeight - h.clientHeight;
+      setP(max > 0 ? h.scrollTop / max : 0);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return (
+    <div className="fixed inset-x-0 top-0 z-50 h-[3px] bg-transparent">
+      <div
+        className="h-full bg-accent shadow-glow transition-[width] duration-150 ease-out"
+        style={{ width: `${p * 100}%` }}
+      />
     </div>
   );
 }
 
-/* ── Chrome bits ─────────────────────────────────────────────────────── */
+/** Right-rail section dots; active dot tracks the section in view. */
+function RailNav() {
+  const [active, setActive] = useState(0);
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            const i = SLIDES.findIndex((s) => s.id === e.target.id);
+            if (i >= 0) setActive(i);
+          }
+        });
+      },
+      { rootMargin: "-45% 0px -45% 0px" },
+    );
+    SLIDES.forEach((s) => {
+      const el = document.getElementById(s.id);
+      if (el) io.observe(el);
+    });
+    return () => io.disconnect();
+  }, []);
 
-function ProgressDots({ i, onJump }: { i: number; onJump: (n: number) => void }) {
+  const go = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (window.__lenis) window.__lenis.scrollTo(el, { offset: 0 });
+    else el.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
-    <div className="flex items-center gap-1.5">
-      {SLIDES.map((s, idx) => (
+    <nav className="fixed right-5 top-1/2 z-50 hidden -translate-y-1/2 flex-col items-end gap-3 md:flex">
+      {SLIDES.map((s, i) => (
         <button
           key={s.id}
-          onClick={() => onJump(idx)}
-          aria-label={`go to slide ${idx + 1}: ${s.id}`}
-          className={
-            "h-1.5 rounded-full transition-all duration-200 " +
-            (idx === i
-              ? "w-7 bg-accent shadow-glow"
-              : idx < i
-                ? "w-3 bg-accent-soft"
-                : "w-3 bg-line hover:bg-line-strong")
-          }
-        />
+          onClick={() => go(s.id)}
+          className="group flex items-center gap-2.5"
+          aria-label={s.label}
+        >
+          <span
+            className={`font-mono text-[11px] uppercase tracking-[0.16em] transition-all duration-300 ${
+              i === active
+                ? "text-accent-ink opacity-100"
+                : "text-ink-faint opacity-0 group-hover:opacity-100"
+            }`}
+          >
+            {s.label}
+          </span>
+          <span
+            className={`h-px transition-all duration-300 ${
+              i === active
+                ? "w-7 bg-accent"
+                : "w-3.5 bg-line-strong group-hover:bg-ink-faint"
+            }`}
+          />
+        </button>
       ))}
-    </div>
+    </nav>
   );
 }
 
-function NavBtn({
-  onClick,
-  disabled,
-  label,
-  arrow,
+/** Reveal-on-scroll wrapper: fades + lifts children into view once. */
+function Reveal({
+  children,
+  delay = 0,
+  className = "",
 }: {
-  onClick: () => void;
-  disabled?: boolean;
-  label: string;
-  arrow: string;
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
 }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint transition-colors hover:border-line-strong hover:bg-surface-2 hover:text-ink disabled:opacity-30 disabled:hover:bg-surface"
-    >
-      <span className="text-sm leading-none">{arrow}</span>
-      {label}
-    </button>
-  );
-}
-
-/* ── Shared slide primitives ────────────────────────────────────────── */
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="font-mono text-[0.7rem] uppercase tracking-[0.22em] text-accent-ink">
-      {children}
-    </p>
-  );
-}
-
-function H({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <h2
-      className={
-        "text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl " +
-        className
-      }
-    >
-      {children}
-    </h2>
-  );
-}
-
-/* ── 1. Title ───────────────────────────────────────────────────────── */
-
-function TitleSlide() {
-  return (
-    <div className="text-center">
-      <SectionLabel>Portaldot S1 · Onchain identity & coordination</SectionLabel>
-
-      <h1 className="mx-auto mt-10 text-balance text-7xl font-semibold leading-[1.02] tracking-tight sm:text-[7.5rem]">
-        Portal <span className="text-accent-ink">Naming</span> Service
-      </h1>
-
-      <p className="mx-auto mt-9 max-w-2xl text-pretty text-lg leading-relaxed text-ink-soft sm:text-xl">
-        ENS for Portaldot. One name. Every dApp. Native ink!.
-      </p>
-
-      <div className="mx-auto mt-14 inline-flex flex-col items-stretch gap-3 rounded-2xl border border-line bg-surface/80 p-5 text-left shadow-lift sm:flex-row sm:items-center sm:gap-5">
-        <code className="font-mono text-base text-ink-faint sm:text-lg">
-          5GrwvaEF5zXb26Fz9rcQpDWS57Ct…HGKutQY
-        </code>
-        <span className="hidden text-accent-ink sm:inline">→</span>
-        <span className="text-center text-2xl text-accent-ink sm:hidden">↓</span>
-        <code className="rounded-lg bg-accent-soft px-3 py-2 font-mono text-2xl text-on-accent shadow-glow">
-          alice.pot
-        </code>
-      </div>
-
-      <p className="mt-12 font-mono text-xs uppercase tracking-[0.2em] text-ink-faint">
-        pnslabs · romario kavin (protocol, dApp) · sairam (contracts)
-      </p>
-    </div>
-  );
-}
-
-/* ── 2. Problem ─────────────────────────────────────────────────────── */
-
-function ProblemSlide() {
-  return (
-    <div>
-      <SectionLabel>The problem</SectionLabel>
-      <H className="mt-5">
-        Portaldot has <span className="text-accent-ink">no ENS</span>.
-      </H>
-      <p className="mt-6 max-w-3xl text-pretty text-xl leading-relaxed text-ink-soft">
-        Every transaction, every payment, every dApp lives or dies by a
-        47-character SS58 string. One typo and the funds are gone.
-      </p>
-
-      <div className="mt-12 grid gap-5 sm:grid-cols-3">
-        <Card title="Who hurts">
-          Every Portaldot user. Every dApp builder. Every wallet that ships a
-          send screen.
-        </Card>
-        <Card title="How bad">
-          ENS on Ethereum handles{" "}
-          <span className="text-ink">~3M names</span> and stops billions in
-          mis-sends a year. Portaldot has none.
-        </Card>
-        <Card title="Why not solved">
-          Portaldot is non-EVM — you can't fork ENS. The stack is 2021-era
-          ink! 3.0.0-rc3 + cargo-contract 0.12. Built native, from scratch.
-        </Card>
-      </div>
-
-      <div className="mt-10 inline-flex items-center gap-3 rounded-xl border border-line bg-surface px-5 py-3.5 text-sm">
-        <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-        <span className="text-ink-soft">
-          <span className="font-medium text-ink">Why now:</span> Portaldot just
-          opened to builders. First naming = de-facto identity layer for
-          everything that ships next.
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface/70 p-5 shadow-panel">
-      <p className="text-[0.72rem] font-medium uppercase tracking-[0.16em] text-accent-ink">
-        {title}
-      </p>
-      <p className="mt-2.5 text-base leading-relaxed text-ink-soft">{children}</p>
-    </div>
-  );
-}
-
-/* ── 3. Solution ────────────────────────────────────────────────────── */
-
-function SolutionSlide() {
-  return (
-    <div>
-      <SectionLabel>What we shipped</SectionLabel>
-      <H className="mt-5">
-        Six ink! contracts, wired <span className="text-accent-ink">ENS-style</span>,
-        native on Portaldot.
-      </H>
-
-      <div className="mt-10 grid gap-8 lg:grid-cols-[1.1fr,1fr]">
-        {/* Architecture */}
-        <div className="rounded-2xl border border-line bg-surface/70 p-6 shadow-panel">
-          <p className="mb-4 text-[0.72rem] font-medium uppercase tracking-[0.16em] text-accent-ink">
-            Architecture
-          </p>
-          <pre className="overflow-x-auto font-mono text-[0.78rem] leading-relaxed text-ink">
-{`Registry            ← single source of truth
-   │
-   ├── PotRegistrar         .pot ownership, expiry
-   │      ◀── RegistrarController
-   │             commit-reveal · POT rent
-   │
-   ├── PublicResolver       addr / text / name
-   │
-   ├── ReverseRegistrar     addr → primary name
-   │                        forward-verified
-   │
-   └── SubnameRegistrar     subnames + fuses-lite`}
-          </pre>
-        </div>
-
-        {/* Three guarantees */}
-        <div className="grid content-start gap-4">
-          <Guarantee
-            kicker="namehash"
-            text="blake2_256 — byte-identical across the Rust contract, the TS SDK, and the Python SDK. Verified on three implementations."
-          />
-          <Guarantee
-            kicker="registration"
-            text="Commit–reveal. No one can front-run your name."
-          />
-          <Guarantee
-            kicker="reverse"
-            text="Every addr → name lookup is forward-verified. Spoofed reverse records are dropped."
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Guarantee({ kicker, text }: { kicker: string; text: string }) {
-  return (
-    <div className="rounded-xl border border-line bg-surface/60 p-5">
-      <p className="font-mono text-[0.7rem] uppercase tracking-[0.16em] text-accent-ink">
-        {kicker}
-      </p>
-      <p className="mt-1.5 text-base leading-relaxed text-ink-soft">{text}</p>
-    </div>
-  );
-}
-
-/* ── 4. Demo ────────────────────────────────────────────────────────── */
-
-function DemoSlide() {
-  return (
-    <div className="text-center">
-      <SectionLabel>Live demo · 75 seconds</SectionLabel>
-      <H className="mt-5">
-        Switch to the dApp <span className="text-accent-ink">→ /</span>
-      </H>
-
-      <div className="mt-12 grid gap-4 text-left sm:grid-cols-3">
-        <Beat
-          n="1"
-          title="Mint"
-          body="Type a name. Search shows AVAILABLE with the length-tier price in POT. Sign in with Google — wallet is created in-app, no extension. Commit, wait the reveal window, register."
-        />
-        <Beat
-          n="2"
-          title="Resolve"
-          body="The new name resolves forward to your address. Set it as your primary. Reverse lookup now returns the name, marked FORWARD-VERIFIED."
-        />
-        <Beat
-          n="3"
-          title="Integrate"
-          body={
-            <>
-              Three lines of TypeScript:{" "}
-              <code className="font-mono text-accent-ink">await pns.resolve(&quot;alice.pot&quot;)</code>
-              . Any Portaldot dApp gets name resolution today.
-            </>
-          }
-        />
-      </div>
-
-      <div className="mt-10 inline-flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-medium text-on-accent shadow-glow transition-colors hover:bg-accent-strong"
-        >
-          Open the dApp
-          <span aria-hidden>→</span>
-        </Link>
-        <Link
-          href="/docs"
-          className="inline-flex items-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-medium text-ink-soft transition-colors hover:border-line-strong hover:bg-surface-2 hover:text-ink"
-        >
-          Read the SDK docs
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function Beat({
-  n,
-  title,
-  body,
-}: {
-  n: string;
-  title: string;
-  body: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface/70 p-5 shadow-panel">
-      <div className="flex items-center gap-3">
-        <span className="grid h-7 w-7 place-items-center rounded-full border border-accent-soft bg-accent-soft/30 font-mono text-xs text-accent-ink">
-          {n}
-        </span>
-        <p className="text-sm font-medium uppercase tracking-[0.14em] text-ink">{title}</p>
-      </div>
-      <p className="mt-3 text-[0.95rem] leading-relaxed text-ink-soft">{body}</p>
-    </div>
-  );
-}
-
-/* ── 5. Scale ───────────────────────────────────────────────────────── */
-
-function ScaleSlide() {
-  return (
-    <div>
-      <SectionLabel>Scale</SectionLabel>
-      <H className="mt-5">
-        Naming infrastructure <span className="text-accent-ink">compounds</span>.
-      </H>
-      <p className="mt-6 max-w-3xl text-pretty text-xl leading-relaxed text-ink-soft">
-        Two names on chain today. The same architecture handles a million
-        with no migration.
-      </p>
-
-      <div className="mt-12 grid gap-5 sm:grid-cols-3">
-        <Metric value="~0.03" unit="POT / read" label="Per-call resolver cost — same on day 1 as day 10,000." />
-        <Metric value="100" unit="KiB Wasm" label="Resolver fits in one contract. Hot-swappable behind the registry." />
-        <Metric value="0" unit="migrations" label="Registry indirection means resolvers upgrade with zero name moves." />
-      </div>
-
-      <p className="mt-10 max-w-3xl text-base leading-relaxed text-ink-faint">
-        Whoever ships naming first becomes the default identity layer. Every
-        wallet, every payment, every subname after that compounds on the same
-        registry.
-      </p>
-    </div>
-  );
-}
-
-function Metric({
-  value,
-  unit,
-  label,
-}: {
-  value: string;
-  unit: string;
-  label: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface/70 p-6 shadow-panel">
-      <p className="font-mono text-4xl text-ink sm:text-5xl">{value}</p>
-      <p className="mt-1 font-mono text-xs uppercase tracking-[0.16em] text-accent-ink">
-        {unit}
-      </p>
-      <p className="mt-4 text-sm leading-relaxed text-ink-soft">{label}</p>
-    </div>
-  );
-}
-
-/* ── 6. Business ────────────────────────────────────────────────────── */
-
-function BusinessSlide() {
-  return (
-    <div>
-      <SectionLabel>Revenue · baked into the spec</SectionLabel>
-      <H className="mt-5">
-        Three streams, <span className="text-accent-ink">100% in POT</span>.
-      </H>
-
-      <div className="mt-10 overflow-hidden rounded-2xl border border-line bg-surface/70 shadow-panel">
-        <Row
-          stream="Length-tier rent"
-          detail="Annual rent per name — shorter names cost more. Per-spec §5."
-          amount="640 / 160 / 40 / 5"
-          unit="POT / year"
-        />
-        <Row
-          stream="Premium auction"
-          detail="Dutch auction on expired premium names. v2 path."
-          amount="market"
-          unit="POT"
-        />
-        <Row
-          stream="Subname protocol fee"
-          detail="Small percentage on paid subname self-mints."
-          amount="≤ 5%"
-          unit="of mint"
-          last
-        />
-      </div>
-
-      <p className="mt-8 max-w-3xl text-base leading-relaxed text-ink-soft">
-        All proceeds accrue to a <span className="text-ink">Portaldot-controlled treasury</span>.
-        Naming pays for itself, and pays back the chain that hosts it.
-      </p>
-    </div>
-  );
-}
-
-function Row({
-  stream,
-  detail,
-  amount,
-  unit,
-  last,
-}: {
-  stream: string;
-  detail: string;
-  amount: string;
-  unit: string;
-  last?: boolean;
-}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setShown(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.18 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   return (
     <div
-      className={
-        "grid grid-cols-[1fr,auto] items-center gap-5 px-6 py-5 sm:grid-cols-[1.4fr,1fr,auto] " +
-        (last ? "" : "border-b border-line")
-      }
+      ref={ref}
+      className={`transition-all duration-700 ease-out ${
+        shown ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"
+      } ${className}`}
+      style={{ transitionDelay: shown ? `${delay}ms` : "0ms" }}
     >
-      <div>
-        <p className="text-base font-medium text-ink">{stream}</p>
-        <p className="mt-1 text-sm text-ink-faint">{detail}</p>
-      </div>
-      <p className="hidden font-mono text-xl text-accent-ink sm:block">{amount}</p>
-      <p className="font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
-        {unit}
-      </p>
+      {children}
     </div>
   );
 }
 
-/* ── 7. Ask ─────────────────────────────────────────────────────────── */
-
-function AskSlide() {
-  return (
-    <div>
-      <SectionLabel>What we need from Portaldot</SectionLabel>
-      <H className="mt-5">
-        Three asks. <span className="text-accent-ink">30 days each.</span>
-      </H>
-
-      <div className="mt-10 grid gap-4">
-        <Ask
-          n="1"
-          title="Persistent testnet endpoint"
-          body="The public dev node resets — every reset wipes user names. A testnet RPC with persistent state lets real users keep names across sessions."
-        />
-        <Ask
-          n="2"
-          title="Wallet integration conversation"
-          body="A 30-minute chat with the Portaldot wallet team about embedding pns.resolve() in the send flow. SDK is ~3KB tree-shaken, zero-dep outside @polkadot/api."
-        />
-        <Ask
-          n="3"
-          title="Bigger pallet-contracts code_size cap"
-          body="Bump the runtime cap to 256 KiB so PaymentRecord + ProfileRecord land in v1.1 without surgery."
-        />
-      </div>
-
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-accent-soft/50 bg-accent-soft/10 px-6 py-5">
-        <div>
-          <p className="font-mono text-[0.7rem] uppercase tracking-[0.18em] text-accent-ink">
-            Open source · live today
-          </p>
-          <p className="mt-2 text-lg text-ink">
-            Type a name. Get an address. Welcome to Portaldot.
-          </p>
-        </div>
-        <a
-          href="https://github.com/RomarioKavin1/PortalNamingService"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-medium text-on-accent shadow-glow transition-colors hover:bg-accent-strong"
-        >
-          github.com / PortalNamingService
-          <span aria-hidden>↗</span>
-        </a>
-      </div>
-    </div>
-  );
-}
-
-function Ask({
-  n,
-  title,
-  body,
+/** Full-height section shell with consistent padding + eyebrow. */
+function Section({
+  id,
+  eyebrow,
+  children,
+  className = "",
 }: {
-  n: string;
-  title: string;
-  body: React.ReactNode;
+  id: string;
+  eyebrow?: string;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex gap-5 rounded-2xl border border-line bg-surface/70 p-5 shadow-panel">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-accent-soft bg-accent-soft/30 font-mono text-sm text-accent-ink">
-        {n}
-      </span>
-      <div>
-        <p className="text-lg font-medium text-ink">{title}</p>
-        <p className="mt-1.5 text-[0.95rem] leading-relaxed text-ink-soft">{body}</p>
+    <section
+      id={id}
+      className={`relative flex min-h-screen flex-col justify-center px-6 py-24 sm:px-10 md:px-20 ${className}`}
+    >
+      <div className="mx-auto w-full max-w-5xl">
+        {eyebrow && (
+          <Reveal>
+            <p className="mb-5 font-mono text-xs uppercase tracking-[0.22em] text-accent-ink">
+              {eyebrow}
+            </p>
+          </Reveal>
+        )}
+        {children}
       </div>
-    </div>
+    </section>
+  );
+}
+
+/* ------------------------------- slides ------------------------------- */
+
+function Title() {
+  return (
+    <section
+      id="title"
+      className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center"
+    >
+      {/* soft radial glow behind the wordmark */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[60vh] w-[60vh] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-60 blur-3xl"
+        style={{ background: "var(--accent-glow)" }}
+      />
+      <Reveal>
+        <p className="mb-6 font-mono text-xs uppercase tracking-[0.3em] text-ink-faint">
+          pnslabs · seed
+        </p>
+      </Reveal>
+      <Reveal delay={120}>
+        <h1 className="text-6xl font-semibold tracking-tight text-ink sm:text-8xl">
+          pns<span className="text-accent-ink">.pot</span>
+        </h1>
+      </Reveal>
+      <Reveal delay={240}>
+        <p className="mt-6 max-w-xl text-balance text-lg text-ink-soft sm:text-2xl">
+          The naming &amp; identity layer for Portaldot. One{" "}
+          <span className="font-mono text-accent-ink">.pot</span> name is your
+          account, your profile, and your payment address.
+        </p>
+      </Reveal>
+      <Reveal delay={380}>
+        <button
+          onClick={() => window.__lenis?.scrollTo("#problem")}
+          className="mt-12 inline-flex items-center gap-2 rounded-full border border-line px-5 py-2.5 font-mono text-sm text-ink-soft transition-colors hover:border-accent/60 hover:text-ink"
+        >
+          scroll
+          <span className="inline-block animate-bounce">↓</span>
+        </button>
+      </Reveal>
+    </section>
+  );
+}
+
+function Problem() {
+  return (
+    <Section id="problem" eyebrow="The problem">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          Crypto addresses are{" "}
+          <span className="text-accent-ink">unusable by humans.</span>
+        </h2>
+      </Reveal>
+      <Reveal delay={140}>
+        <div className="mt-8 rounded-2xl border border-line bg-surface p-6 shadow-panel">
+          <p className="break-all font-mono text-sm text-ink-faint sm:text-base">
+            5Gg7tZDAPRUyoouUzeM1oo3K4migHxH31gcgXUqLS1AoErcZ
+          </p>
+          <p className="mt-3 text-sm text-ink-soft">
+            48 characters. One typo sends funds to the void. You cannot read it,
+            remember it, or trust it at a glance.
+          </p>
+        </div>
+      </Reveal>
+      <div className="mt-10 grid gap-5 sm:grid-cols-3">
+        {[
+          ["No identity", "An account is a hash. No name, no profile, no reputation travels with it."],
+          ["Payments are fragile", "Every transfer is a copy-paste leap of faith across a 48-char string."],
+          ["Portaldot had no answer", "A live chain with a real community — and no native naming primitive at all."],
+        ].map(([h, b], i) => (
+          <Reveal key={h} delay={i * 110}>
+            <div className="h-full rounded-2xl border border-line bg-surface-2 p-5">
+              <p className="font-medium text-ink">{h}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-soft">{b}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Solution() {
+  return (
+    <Section id="solution" eyebrow="The solution">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          <span className="font-mono text-accent-ink">alice.pot</span> resolves
+          to everything.
+        </h2>
+      </Reveal>
+      <Reveal delay={140}>
+        <p className="mt-6 max-w-2xl text-lg text-ink-soft">
+          PNS is ENS, faithfully rebuilt for Portaldot as five ink! smart
+          contracts. A human-readable name maps to an account — and carries
+          records, a profile, payments, and programmable subnames with it.
+        </p>
+      </Reveal>
+      <div className="mt-10 grid gap-5 sm:grid-cols-2">
+        {[
+          ["Forward resolution", "alice.pot → account + address records, normalized and Blake2_256-namehashed on chain."],
+          ["Reverse + identity", "account → primary name, forward-verified so it can't be spoofed. Profile/text records included."],
+          ["Name-based payments", "Send to alice.pot, not to a 48-char hash. The name is the rail."],
+          ["Programmable subnames", "pay.alice.pot, dao.alice.pot — issued with fuses-lite permissioning."],
+        ].map(([h, b], i) => (
+          <Reveal key={h} delay={i * 90}>
+            <div className="h-full rounded-2xl border border-line bg-surface p-6 shadow-panel">
+              <p className="font-medium text-ink">{h}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-soft">{b}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function WhyNow() {
+  return (
+    <Section id="why-now" eyebrow="Why now">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          The chain is live. The primitive is missing.
+        </h2>
+      </Reveal>
+      <div className="mt-10 space-y-5">
+        {[
+          ["Portaldot is in production", "Mainnet runs today on a Substrate 3.0.0 runtime with pallet-contracts. Users and balances are real — naming is the obvious gap."],
+          ["ENS proved the demand", "ENS turned naming into one of crypto's stickiest primitives. Every serious chain needs its own. Portaldot's is unclaimed."],
+          ["We solved the hard part", "Building 2021-era ink! in 2026 is a brick wall. We have a reproducible toolchain and a deployed contract suite. The moat is the build."],
+        ].map(([h, b], i) => (
+          <Reveal key={h} delay={i * 110}>
+            <div className="flex gap-5 rounded-2xl border border-line bg-surface p-6 shadow-panel">
+              <span className="font-mono text-2xl text-accent-ink">
+                0{i + 1}
+              </span>
+              <div>
+                <p className="font-medium text-ink">{h}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
+                  {b}
+                </p>
+              </div>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Market() {
+  const rows = [
+    ["TAM", "On-chain naming & identity", "Every L1/L2 needs a name layer; ENS alone has registered millions of names."],
+    ["SAM", "Substrate / Polkadot-family chains", "Dozens of app-chains with no ink!-native ENS equivalent."],
+    ["SOM", "Portaldot accounts", "Every account on the chain is a candidate name + renewal."],
+  ];
+  return (
+    <Section id="market" eyebrow="Market">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          Naming is{" "}
+          <span className="text-accent-ink">per-chain infrastructure.</span>
+        </h2>
+      </Reveal>
+      <Reveal delay={120}>
+        <p className="mt-6 max-w-2xl text-lg text-ink-soft">
+          It is not winner-take-all across chains — it is winner-take-most{" "}
+          <em>within</em> a chain. We are first on Portaldot, with a design that
+          ports to any pallet-contracts runtime.
+        </p>
+      </Reveal>
+      <div className="mt-10 space-y-3">
+        {rows.map(([k, t, d], i) => (
+          <Reveal key={k} delay={i * 100}>
+            <div className="flex flex-col gap-1 rounded-2xl border border-line bg-surface p-6 shadow-panel sm:flex-row sm:items-center sm:gap-6">
+              <span className="w-16 font-mono text-lg text-accent-ink">{k}</span>
+              <span className="flex-1 font-medium text-ink">{t}</span>
+              <span className="flex-1 text-sm text-ink-soft">{d}</span>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Product() {
+  return (
+    <Section id="product" eyebrow="Product · live today">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          Search. Mint. Resolve. <span className="text-accent-ink">Shipped.</span>
+        </h2>
+      </Reveal>
+      <Reveal delay={120}>
+        <div className="mt-10 overflow-hidden rounded-2xl border border-line bg-surface shadow-lift">
+          <div className="flex items-center gap-2 border-b border-line bg-surface-2 px-4 py-3">
+            <span className="h-2.5 w-2.5 rounded-full bg-danger/70" />
+            <span className="h-2.5 w-2.5 rounded-full bg-warn/70" />
+            <span className="h-2.5 w-2.5 rounded-full bg-ok/70" />
+            <span className="ml-3 font-mono text-xs text-ink-faint">pns.pot</span>
+          </div>
+          <div className="p-8">
+            <div className="flex items-stretch overflow-hidden rounded-xl border border-line bg-surface-2">
+              <div className="flex-1 px-5 py-4 font-mono text-lg text-ink">
+                alice
+                <span className="ml-0.5 inline-block h-5 w-px translate-y-1 animate-pulse bg-accent" />
+              </div>
+              <span className="flex items-center pr-5 font-mono text-lg text-accent-ink">
+                .pot
+              </span>
+              <div className="flex items-center bg-accent px-6 font-medium text-on-accent">
+                Search
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-ok-soft bg-ok-soft/30 px-4 py-3 text-sm">
+              <span className="text-ok">●</span>
+              <span className="text-ink-soft">
+                <span className="font-mono text-ink">alice.pot</span> is
+                available — mint for 5 POT / year.
+              </span>
+            </div>
+          </div>
+        </div>
+      </Reveal>
+      <Reveal delay={220}>
+        <p className="mt-6 font-mono text-sm text-ink-faint">
+          Live dApp · 5 ink! contracts deployed on testnet ·{" "}
+          <span className="text-accent-ink">npm: portaldot-pns</span>
+        </p>
+      </Reveal>
+    </Section>
+  );
+}
+
+function Traction() {
+  const stats = [
+    ["5", "ink! contracts deployed & wired on testnet"],
+    ["1", "working dApp — mint, resolve, reverse, subnames"],
+    ["0→1", "first naming service ever on Portaldot"],
+  ];
+  return (
+    <Section id="traction" eyebrow="Traction">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          From blocked toolchain to a live deployment.
+        </h2>
+      </Reveal>
+      <div className="mt-10 grid gap-5 sm:grid-cols-3">
+        {stats.map(([n, l], i) => (
+          <Reveal key={l} delay={i * 120}>
+            <div className="rounded-2xl border border-line bg-surface p-7 text-center shadow-panel">
+              <p className="text-5xl font-semibold tracking-tight text-accent-ink">
+                {n}
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-ink-soft">{l}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+      <Reveal delay={200}>
+        <p className="mt-8 max-w-2xl text-ink-soft">
+          The registry, .pot registrar, commit-reveal controller, public
+          resolver, reverse registrar, and subname registrar are all on chain
+          and talking to each other. The hard, undifferentiated work — a
+          reproducible 2021-era ink! build — is done.
+        </p>
+      </Reveal>
+    </Section>
+  );
+}
+
+function Model() {
+  const tiers = [
+    ["5+ chars", "5 POT / yr", "the long tail of names"],
+    ["4 chars", "40 POT / yr", "scarcer, priced up"],
+    ["3 chars", "160 POT / yr", "premium"],
+    ["1–2 chars", "640 POT / yr", "ultra-rare"],
+  ];
+  return (
+    <Section id="model" eyebrow="Business model">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          Length-priced registrations,{" "}
+          <span className="text-accent-ink">renewed every year.</span>
+        </h2>
+      </Reveal>
+      <Reveal delay={120}>
+        <p className="mt-6 max-w-2xl text-lg text-ink-soft">
+          Recurring POT revenue that scales with adoption. Shorter names cost
+          more — the ENS-proven curve that funds the protocol and a treasury.
+        </p>
+      </Reveal>
+      <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {tiers.map(([len, price, note], i) => (
+          <Reveal key={len} delay={i * 90}>
+            <div className="h-full rounded-2xl border border-line bg-surface p-6 shadow-panel">
+              <p className="font-mono text-xs uppercase tracking-[0.16em] text-ink-faint">
+                {len}
+              </p>
+              <p className="mt-3 text-2xl font-semibold text-accent-ink">
+                {price}
+              </p>
+              <p className="mt-2 text-sm text-ink-soft">{note}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Competition() {
+  return (
+    <Section id="competition" eyebrow="Why we win">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          ENS can&apos;t follow us here.
+        </h2>
+      </Reveal>
+      <div className="mt-10 grid gap-5 md:grid-cols-2">
+        <Reveal>
+          <div className="h-full rounded-2xl border border-line bg-surface-2 p-7">
+            <p className="font-mono text-sm uppercase tracking-[0.16em] text-ink-faint">
+              ENS / EVM naming
+            </p>
+            <ul className="mt-4 space-y-3 text-sm text-ink-soft">
+              <li>— EVM-only; Portaldot is non-EVM Substrate.</li>
+              <li>— No path to pallet-contracts without a rebuild.</li>
+              <li>— Solidity, not ink!.</li>
+            </ul>
+          </div>
+        </Reveal>
+        <Reveal delay={120}>
+          <div className="h-full rounded-2xl border border-accent/40 bg-surface p-7 shadow-glow">
+            <p className="font-mono text-sm uppercase tracking-[0.16em] text-accent-ink">
+              PNS
+            </p>
+            <ul className="mt-4 space-y-3 text-sm text-ink">
+              <li className="text-accent-ink">— Native ink! on Portaldot.</li>
+              <li>— ENS-faithful architecture, ported, not faked.</li>
+              <li>— Reproducible 2021-toolchain build — our real moat.</li>
+              <li>— First mover with the contracts already live.</li>
+            </ul>
+          </div>
+        </Reveal>
+      </div>
+      <Reveal delay={200}>
+        <p className="mt-8 text-ink-soft">
+          The competition isn&apos;t another team — it&apos;s the{" "}
+          <span className="text-ink">build barrier</span>. We already climbed it.
+        </p>
+      </Reveal>
+    </Section>
+  );
+}
+
+function Team() {
+  return (
+    <Section id="team" eyebrow="Team">
+      <Reveal>
+        <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          pnslabs
+        </h2>
+      </Reveal>
+      <Reveal delay={120}>
+        <p className="mt-6 max-w-2xl text-lg text-ink-soft">
+          We reverse-engineered Portaldot&apos;s runtime, resurrected a 2021 ink!
+          toolchain that the docs themselves get wrong, and shipped a full ENS
+          port — contracts, SDKs (TypeScript + Python), and a live dApp — end to
+          end.
+        </p>
+      </Reveal>
+      <div className="mt-10 grid gap-5 sm:grid-cols-3">
+        {[
+          ["Protocol", "ink! 3.0-rc3 contracts, Blake2_256 namehash, commit-reveal."],
+          ["Tooling", "Dockerized frozen-index build; substrate-interface deploy scripts."],
+          ["Product", "Next.js dApp, Privy-backed signing, TS + Py SDKs on npm/PyPI."],
+        ].map(([h, b], i) => (
+          <Reveal key={h} delay={i * 100}>
+            <div className="h-full rounded-2xl border border-line bg-surface p-6 shadow-panel">
+              <p className="font-medium text-accent-ink">{h}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-soft">{b}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Ask() {
+  return (
+    <section
+      id="ask"
+      className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center"
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[55vh] w-[55vh] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-50 blur-3xl"
+        style={{ background: "var(--accent-glow)" }}
+      />
+      <Reveal>
+        <p className="font-mono text-xs uppercase tracking-[0.24em] text-accent-ink">
+          The ask
+        </p>
+      </Reveal>
+      <Reveal delay={120}>
+        <h2 className="mt-6 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-ink sm:text-6xl">
+          Own the name layer of an entire chain.
+        </h2>
+      </Reveal>
+      <Reveal delay={240}>
+        <div className="mt-10 grid w-full max-w-2xl gap-4 sm:grid-cols-3">
+          {[
+            ["Contracts", "Subname fuses + treasury"],
+            ["Go-to-market", "Wallets + dApp integrations"],
+            ["Mainnet", "Audited launch + renewals"],
+          ].map(([h, b]) => (
+            <div
+              key={h}
+              className="rounded-2xl border border-line bg-surface p-5 text-left shadow-panel"
+            >
+              <p className="font-medium text-ink">{h}</p>
+              <p className="mt-1.5 text-sm text-ink-soft">{b}</p>
+            </div>
+          ))}
+        </div>
+      </Reveal>
+      <Reveal delay={360}>
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-4">
+          <a
+            href="/"
+            className="rounded-full bg-accent px-7 py-3 font-medium text-on-accent shadow-glow transition-transform hover:scale-[1.03]"
+          >
+            Try the live dApp
+          </a>
+          <span className="font-mono text-sm text-ink-faint">
+            pnslabs · hello@pns.pot
+          </span>
+        </div>
+      </Reveal>
+    </section>
   );
 }

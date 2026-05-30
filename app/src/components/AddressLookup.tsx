@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { checkAddress } from "@polkadot/util-crypto";
 import { useNetwork } from "@/lib/network-context";
 import { shortAddr } from "@/lib/format";
 import { Button, inputClass } from "@/components/ui";
@@ -20,6 +21,21 @@ export function AddressLookup() {
   const lookup = async () => {
     const addr = input.trim();
     if (!addr || !net.ready) return;
+
+    // This box is the reverse direction (address -> name). A bare/.pot name
+    // belongs in the search box above; reject it with a clear message instead
+    // of leaking the raw base58 decode error from decodeAddress().
+    const [isValid] = checkAddress(addr, 42); // Portaldot SS58 prefix
+    if (!isValid) {
+      setState({
+        kind: "error",
+        message: addr.includes(".pot")
+          ? "That's a name, not an address. Use the search box above to resolve a .pot name."
+          : "Enter a valid SS58 address (starts with 5…).",
+      });
+      return;
+    }
+
     setState({ kind: "loading" });
     try {
       const client = await getClient();
