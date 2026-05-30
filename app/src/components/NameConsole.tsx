@@ -7,6 +7,7 @@ import { useSubstrateAccount } from "@/lib/use-account";
 import { createPrivySigner } from "@/lib/privy-signer";
 import { registerName } from "@/lib/register";
 import { requestFaucet } from "@/lib/faucet";
+import { addOwnedName } from "@/lib/owned-names";
 import { shortAddr, quote60d } from "@/lib/format";
 import { Button, CopyButton } from "@/components/ui";
 
@@ -205,6 +206,7 @@ function MintPanel({
         rawName: name,
         onStep: (step) => setPhase({ kind: "minting", step }),
       });
+      addOwnedName(address, `${name}.pot`);
       onMinted(address);
     } catch (e: unknown) {
       setPhase({ kind: "error", message: msg(e) });

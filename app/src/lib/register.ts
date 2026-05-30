@@ -29,7 +29,7 @@ function compactLen(n: number): Uint8Array {
   throw new Error("compactLen: unsupported size " + n);
 }
 
-async function submit(
+export async function submitContractCall(
   api: ApiPromise,
   signer: Signer,
   fromAddress: string,
@@ -104,7 +104,7 @@ export async function registerName(opts: RegisterOpts): Promise<{ node: Uint8Arr
   step("Committing…");
   const commitInput = u8aConcat(labelBytes, ownerPubkey, secret);
   const commitment = blake2AsU8a(commitInput, 256);
-  await submit(api, signer, fromAddress,
+  await submitContractCall(api, signer, fromAddress,
     controller, 0n,
     buildCallData(defaultSelector("commit"), commitment),
   );
@@ -116,7 +116,7 @@ export async function registerName(opts: RegisterOpts): Promise<{ node: Uint8Arr
   const durBuf = new ArrayBuffer(8);
   new DataView(durBuf).setBigUint64(0, BigInt(durationMs), true);
   const regArgs = u8aConcat(nameScale, ownerPubkey, new Uint8Array(durBuf), secret);
-  await submit(api, signer, fromAddress,
+  await submitContractCall(api, signer, fromAddress,
     controller, price + PLANCK,
     buildCallData(defaultSelector("register"), regArgs),
   );
@@ -125,7 +125,7 @@ export async function registerName(opts: RegisterOpts): Promise<{ node: Uint8Arr
   step("Wiring resolver…");
   const node = namehash(`${name}.pot`);
   const resolverPubkey = decodeAddress(resolver);
-  await submit(api, signer, fromAddress,
+  await submitContractCall(api, signer, fromAddress,
     registry, 0n,
     buildCallData(
       defaultSelector("set_resolver"),
@@ -138,7 +138,7 @@ export async function registerName(opts: RegisterOpts): Promise<{ node: Uint8Arr
   const coinTypeBuf = new ArrayBuffer(4);
   new DataView(coinTypeBuf).setUint32(0, COIN_POT, true);
   const valScale = u8aConcat(compactLen(32), ownerPubkey);
-  await submit(api, signer, fromAddress,
+  await submitContractCall(api, signer, fromAddress,
     resolver, 0n,
     buildCallData(
       defaultSelector("set_addr"),

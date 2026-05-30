@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { NameConsole } from "@/components/NameConsole";
 import { AddressLookup } from "@/components/AddressLookup";
+import { YourNames } from "@/components/YourNames";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
@@ -45,6 +46,8 @@ export default function Home() {
 
           {mode === "mint" ? <NameConsole /> : <AddressLookup />}
         </section>
+
+        <YourNames />
 
         <FeatureRow />
 
