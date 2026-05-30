@@ -56,6 +56,8 @@ export function YourNames() {
         signer,
         fromAddress: address,
         reverseRegistrar: net.contracts.reverseRegistrar,
+        registry: net.contracts.registry,
+        publicResolver: net.contracts.publicResolver,
         fullName,
       });
       setPrimary(fullName);
