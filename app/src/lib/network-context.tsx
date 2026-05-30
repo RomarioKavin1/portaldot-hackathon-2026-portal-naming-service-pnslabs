@@ -16,16 +16,46 @@ import {
   type NetworkKey,
 } from "@/lib/networks";
 
-/** One cached client per network, created lazily on first use. */
+/** One cached client per network, created lazily on first use. Invalidated
+ *  whenever the underlying WS drops so a stale, disconnected api can't hang
+ *  the next call indefinitely. */
 const clients = new Map<NetworkKey, Promise<PnsClient>>();
 
 export function clientFor(net: NetworkDef): Promise<PnsClient> {
-  let c = clients.get(net.key);
-  if (!c) {
-    c = PnsClient.connect({ url: net.url, contracts: net.contracts });
-    clients.set(net.key, c);
+  const existing = clients.get(net.key);
+  if (existing) {
+    // Fast-path: defensively probe the resolved api in case the disconnect
+    // event was missed. If it really is down, evict and rebuild on next call.
+    return existing.then((client) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const api: any = (client as any)?.connection?.api;
+      if (api && api.isConnected === false) {
+        if (clients.get(net.key) === existing) clients.delete(net.key);
+        return clientFor(net);
+      }
+      return client;
+    });
   }
-  return c;
+
+  // `built` is captured per-call so the `drop` closure invalidates the right
+  // promise even if multiple networks build concurrently or a later call
+  // already replaced us.
+  const built: Promise<PnsClient> = (async () => {
+    const client = await PnsClient.connect({ url: net.url, contracts: net.contracts });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const api: any = (client as any)?.connection?.api;
+    if (api?.on) {
+      const drop = () => {
+        if (clients.get(net.key) === built) clients.delete(net.key);
+      };
+      api.on("disconnected", drop);
+      api.on("error", drop);
+    }
+    return client;
+  })();
+
+  clients.set(net.key, built);
+  return built;
 }
 
 interface NetworkCtx {

@@ -37,6 +37,26 @@ type LookupResult =
   | { status: "invalid"; addr: string }
   | { status: "error"; message: string };
 
+type MintPhase = "idle" | "funding" | "minting" | "done";
+
+type MintFlowState = {
+  active: { label: string; priceYr: number } | null;
+  phase: MintPhase;
+  stepIdx: number;
+  done: number[];
+  fundError: string | null;
+  mintError: string | null;
+};
+
+const IDLE_STATE: MintFlowState = {
+  active: null,
+  phase: "idle",
+  stepIdx: 0,
+  done: [],
+  fundError: null,
+  mintError: null,
+};
+
 /* length-tier annual pricing, mirrors lib/register.ts and design data */
 function priceForLabel(label: string): number {
   const n = label.length;
@@ -46,6 +66,121 @@ function priceForLabel(label: string): number {
   return 640;
 }
 
+/**
+ * Mint orchestration as an imperative hook. `start()` is invoked from a click,
+ * not from a `useEffect` — that auto-fire pattern hung under React 18 strict
+ * mode (setup → cleanup → setup ran the flow but the in-flight async bailed
+ * at `cancelled` after the faucet drip, so nothing on-chain ever fired).
+ */
+function useMintFlow(onSuccess: (address: string, label: string) => void) {
+  const { net, getClient } = useNetwork();
+  const { wallet, address, signMessage } = useSubstrateAccount();
+
+  const [state, setState] = useState<MintFlowState>(IDLE_STATE);
+
+  // runId scopes side-effects to the run that started them. A newer start() or
+  // a reset() bumps the id; stale resolves are dropped at `isCurrent()` gates.
+  const runIdRef = useRef(0);
+  const runningRef = useRef(false);
+
+  const onSuccessRef = useRef(onSuccess);
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  });
+
+  const reset = () => {
+    runIdRef.current += 1;
+    runningRef.current = false;
+    setState(IDLE_STATE);
+  };
+
+  const start = async (label: string, priceYr: number) => {
+    if (runningRef.current) return;
+    if (!address || !wallet) return;
+    runningRef.current = true;
+    runIdRef.current += 1;
+    const runId = runIdRef.current;
+    const isCurrent = () => runIdRef.current === runId;
+
+    setState({
+      active: { label, priceYr },
+      phase: "funding",
+      stepIdx: 0,
+      done: [],
+      fundError: null,
+      mintError: null,
+    });
+
+    try {
+      const r = await requestFaucet(address);
+      if (!isCurrent()) return;
+      if (r.error && !/wait/i.test(r.error)) {
+        setState((s) => ({ ...s, fundError: r.error ?? "Faucet failed" }));
+        return;
+      }
+      setState((s) => ({ ...s, phase: "minting" }));
+
+      const client = await getClient();
+      if (!isCurrent()) return;
+      const api = client.connection.api;
+      const signer = createPrivySigner(api, wallet, signMessage);
+
+      await registerName({
+        api,
+        signer,
+        fromAddress: address,
+        controller: net.contracts.registrarController,
+        registry: net.contracts.registry,
+        resolver: net.contracts.publicResolver,
+        rawName: label,
+        onStep: (step) => {
+          if (!isCurrent()) return;
+          const idx = /commit/i.test(step)
+            ? 0
+            : /register/i.test(step)
+              ? 1
+              : /wiring/i.test(step)
+                ? 2
+                : /publishing/i.test(step)
+                  ? 3
+                  : null;
+          if (idx === null) return;
+          setState((cur) => {
+            const all = new Set(cur.done);
+            for (let i = 0; i < idx; i++) all.add(i);
+            return {
+              ...cur,
+              stepIdx: idx,
+              done: [...all].sort((a, b) => a - b),
+            };
+          });
+        },
+      });
+
+      if (!isCurrent()) return;
+      setState((s) => ({
+        ...s,
+        phase: "done",
+        stepIdx: 3,
+        done: [0, 1, 2, 3],
+      }));
+      addOwnedName(address, `${label}.pot`);
+      onSuccessRef.current(address, label);
+    } catch (e: unknown) {
+      if (isCurrent()) {
+        setState((s) => ({
+          ...s,
+          mintError: e instanceof Error ? e.message : String(e),
+        }));
+      }
+    } finally {
+      if (isCurrent()) runningRef.current = false;
+    }
+  };
+
+  return { state, start, reset };
+}
+
 export function SearchConsole() {
   const { net, getClient } = useNetwork();
   const [tab, setTab] = useState<Tab>("register");
@@ -53,13 +188,24 @@ export function SearchConsole() {
   const [busy, setBusy] = useState(false);
   const [reg, setReg] = useState<RegisterResult | null>(null);
   const [lookup, setLookup] = useState<LookupResult | null>(null);
-  const [minting, setMinting] = useState<string | null>(null);
 
+  const mint = useMintFlow((address, label) => {
+    setReg((cur) =>
+      cur && cur.label === label
+        ? { status: "registered", label, name: `${label}.pot`, address }
+        : cur,
+    );
+  });
+
+  // Keep `mint.reset` outside deps — its identity changes every render. Tab
+  // switch always means a fresh start, so resetting unconditionally is fine.
+  const mintResetRef = useRef(mint.reset);
+  mintResetRef.current = mint.reset;
   useEffect(() => {
     setQ("");
     setReg(null);
     setLookup(null);
-    setMinting(null);
+    mintResetRef.current();
   }, [tab]);
 
   const search = async () => {
@@ -67,6 +213,7 @@ export function SearchConsole() {
     setBusy(true);
     setReg(null);
     setLookup(null);
+    mint.reset();
     try {
       const client = await getClient();
       if (tab === "register") {
@@ -177,18 +324,12 @@ export function SearchConsole() {
         {!busy && tab === "register" && reg && (
           <RegisterResultView
             res={reg}
-            minting={minting === reg.label}
-            onMint={async () => {
+            mintState={mint.state}
+            onMint={() => {
               if (reg.status !== "available") return;
-              setMinting(reg.label);
+              mint.start(reg.label, reg.priceYr);
             }}
-            onMinted={(address) => {
-              if (reg.status === "available") {
-                setReg({ status: "registered", label: reg.label, name: reg.name, address });
-                setMinting(null);
-              }
-            }}
-            onAbort={() => setMinting(null)}
+            onAbort={mint.reset}
           />
         )}
         {!busy && tab === "lookup" && lookup && <LookupResultView res={lookup} />}
@@ -229,15 +370,13 @@ function ResolveSkeleton() {
 
 function RegisterResultView({
   res,
-  minting,
+  mintState,
   onMint,
-  onMinted,
   onAbort,
 }: {
   res: RegisterResult;
-  minting: boolean;
+  mintState: MintFlowState;
   onMint: () => void;
-  onMinted: (address: string) => void;
   onAbort: () => void;
 }) {
   if (res.status === "invalid") {
@@ -272,8 +411,21 @@ function RegisterResultView({
     );
   }
 
-  if (minting) {
-    return <RegisterPipeline label={res.label} priceYr={res.priceYr} onMinted={onMinted} onAbort={onAbort} />;
+  // Pipeline only shows if the active mint is for THIS label — leftover state
+  // from a previous label is invisible here.
+  if (mintState.active && mintState.active.label === res.label) {
+    return (
+      <RegisterPipeline
+        label={mintState.active.label}
+        priceYr={mintState.active.priceYr}
+        phase={mintState.phase}
+        stepIdx={mintState.stepIdx}
+        done={mintState.done}
+        fundError={mintState.fundError}
+        mintError={mintState.mintError}
+        onAbort={onAbort}
+      />
+    );
   }
 
   return (
@@ -304,12 +456,12 @@ function RegisterResultView({
           <b>{res.priceYr.toLocaleString()} POT</b> / year · ~{quote60d(res.label.length)} POT for 60 days
         </div>
       </div>
-      <MintCta priceYr={res.priceYr} label={res.label} onStart={onMint} />
+      <MintCta onStart={onMint} />
     </div>
   );
 }
 
-function MintCta({ onStart }: { priceYr: number; label: string; onStart: () => void }) {
+function MintCta({ onStart }: { onStart: () => void }) {
   const { ready, authenticated, login } = useSubstrateAccount();
   if (!ready) {
     return <Btn variant="dark" size="btn-lg" disabled>Loading…</Btn>;
@@ -328,7 +480,7 @@ function MintCta({ onStart }: { priceYr: number; label: string; onStart: () => v
   );
 }
 
-/* ── Register pipeline — runs the real chain flow with step animation ── */
+/* ── Register pipeline — pure presentation, driven by hoisted mint state ── */
 
 const PIPELINE_STEPS = [
   { key: "commit", title: "Commit", desc: "Submit a hashed commitment. Nobody can see the name yet.", contract: "registrar_controller.commit()" },
@@ -340,106 +492,22 @@ const PIPELINE_STEPS = [
 function RegisterPipeline({
   label,
   priceYr,
-  onMinted,
+  phase,
+  stepIdx,
+  done,
+  fundError,
+  mintError,
   onAbort,
 }: {
   label: string;
   priceYr: number;
-  onMinted: (address: string) => void;
+  phase: MintPhase;
+  stepIdx: number;
+  done: number[];
+  fundError: string | null;
+  mintError: string | null;
   onAbort: () => void;
 }) {
-  const { net, getClient } = useNetwork();
-  const { wallet, address, signMessage } = useSubstrateAccount();
-  const [stepIdx, setStepIdx] = useState(0);
-  const [done, setDone] = useState<number[]>([]);
-  const [fundError, setFundError] = useState<string | null>(null);
-  const [mintError, setMintError] = useState<string | null>(null);
-  const [phase, setPhase] = useState<"funding" | "minting" | "done">("funding");
-
-  // Refs hold the latest unstable callbacks/values without triggering re-runs.
-  const signMessageRef = useRef(signMessage);
-  const getClientRef = useRef(getClient);
-  const netRef = useRef(net);
-  const onMintedRef = useRef(onMinted);
-  useEffect(() => {
-    signMessageRef.current = signMessage;
-    getClientRef.current = getClient;
-    netRef.current = net;
-    onMintedRef.current = onMinted;
-  });
-
-  // Guard so the mint flow runs exactly ONCE per pipeline mount, even though
-  // React 18 strict mode double-mounts and unstable deps re-fire effects. The
-  // faucet has its own server-side rate limit, but spamming it from the client
-  // is wrong regardless.
-  const startedRef = useRef(false);
-
-  useEffect(() => {
-    if (!address || !wallet) return;
-    if (startedRef.current) return;
-    startedRef.current = true;
-    let cancelled = false;
-
-    (async () => {
-      setFundError(null);
-      const r = await requestFaucet(address);
-      if (cancelled) return;
-      if (r.error && !/wait/i.test(r.error)) {
-        setFundError(r.error);
-        return;
-      }
-      setPhase("minting");
-      try {
-        const client = await getClientRef.current();
-        const api = client.connection.api;
-        const signer = createPrivySigner(api, wallet, signMessageRef.current);
-        await registerName({
-          api,
-          signer,
-          fromAddress: address,
-          controller: netRef.current.contracts.registrarController,
-          registry: netRef.current.contracts.registry,
-          resolver: netRef.current.contracts.publicResolver,
-          rawName: label,
-          onStep: (s) => {
-            if (cancelled) return;
-            const idx = /commit/i.test(s)
-              ? 0
-              : /register/i.test(s)
-                ? 1
-                : /wiring/i.test(s)
-                  ? 2
-                  : /publishing/i.test(s)
-                    ? 3
-                    : null;
-            if (idx === null) return;
-            setStepIdx(idx);
-            setDone((d) => {
-              const all = new Set(d);
-              for (let i = 0; i < idx; i++) all.add(i);
-              return [...all].sort((a, b) => a - b);
-            });
-          },
-        });
-        if (cancelled) return;
-        setDone([0, 1, 2, 3]);
-        setStepIdx(3);
-        setPhase("done");
-        addOwnedName(address, `${label}.pot`);
-        onMintedRef.current(address);
-      } catch (e: unknown) {
-        if (!cancelled) setMintError(e instanceof Error ? e.message : String(e));
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // Only re-run if the *identity* of the mint target changes (different
-    // wallet / address / label). Stable callbacks live in refs above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, wallet, label]);
-
   return (
     <div style={{ marginTop: 22, display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 22 }} className="pop-in">
       {/* summary */}

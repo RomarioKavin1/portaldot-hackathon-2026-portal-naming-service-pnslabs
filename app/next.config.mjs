@@ -19,6 +19,17 @@ const nextConfig = {
       ...(config.resolve.alias || {}),
       "@solana-program/memo": false,
     };
+    // Silence the `Critical dependency: the request of a dependency is an
+    // expression` warnings emitted by viem/ox's tempo internals (pulled in by
+    // @privy-io/react-auth). They're dynamic require()s we don't exercise and
+    // can't fix upstream; the warning is pure noise in the dev log.
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      {
+        module: /node_modules[\\/]\.pnpm[\\/]ox@/,
+        message: /Critical dependency: the request of a dependency is an expression/,
+      },
+    ];
     return config;
   },
 };

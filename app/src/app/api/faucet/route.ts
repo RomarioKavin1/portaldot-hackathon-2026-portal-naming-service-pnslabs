@@ -19,15 +19,37 @@ const COOLDOWN_MS = 60_000;
 // Best-effort in-memory rate limit (per address); resets on server restart.
 const lastDrip = new Map<string, number>();
 
-// Cached chain connection across requests.
-let apiPromise: Promise<unknown> | null = null;
+// Cached chain connection across requests. Invalidated whenever the WS drops
+// (chain restart / network blip / idle eviction) so we don't hand out a dead
+// api to the next request — that previously hung the faucet indefinitely.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let apiPromise: Promise<any> | null = null;
+
 async function getApi() {
-  if (!apiPromise) {
-    const { ApiPromise, WsProvider } = await import("@polkadot/api");
-    apiPromise = ApiPromise.create({ provider: new WsProvider(WSS) });
+  if (apiPromise) {
+    try {
+      const api = await apiPromise;
+      if (api?.isConnected) return api;
+    } catch {
+      /* fall through to recreate */
+    }
+    apiPromise = null;
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return apiPromise as Promise<any>;
+  const { ApiPromise, WsProvider } = await import("@polkadot/api");
+  const provider = new WsProvider(WSS);
+  // Drop the cache as soon as the socket goes — next caller gets a fresh one.
+  provider.on("disconnected", () => {
+    apiPromise = null;
+  });
+  provider.on("error", () => {
+    apiPromise = null;
+  });
+  apiPromise = ApiPromise.create({ provider });
+  const api = await apiPromise;
+  api.on("disconnected", () => {
+    apiPromise = null;
+  });
+  return api;
 }
 
 export async function POST(req: Request) {
@@ -64,7 +86,13 @@ export async function POST(req: Request) {
     const keyring = new Keyring({ type: "sr25519", ss58Format: 42 });
     const alice = keyring.addFromUri("//Alice");
 
+    // 30s hard timeout so the route never hangs forever — if the chain stalls
+    // we'd rather return an error than let the browser fetch sit open.
     const hash = await new Promise<string>((resolve, reject) => {
+      const t = setTimeout(
+        () => reject(new Error("Faucet timed out waiting for block inclusion")),
+        30_000,
+      );
       api.tx.balances
         .transfer(address, DRIP)
         .signAndSend(
@@ -75,15 +103,20 @@ export async function POST(req: Request) {
             txHash: { toHex(): string };
           }) => {
             if (result.dispatchError) {
+              clearTimeout(t);
               reject(new Error(result.dispatchError.toString()));
               return;
             }
             if (result.status.isInBlock || result.status.isFinalized) {
+              clearTimeout(t);
               resolve(result.txHash.toHex());
             }
           },
         )
-        .catch(reject);
+        .catch((e: unknown) => {
+          clearTimeout(t);
+          reject(e instanceof Error ? e : new Error(String(e)));
+        });
     });
 
     return json({ ok: true, amount: "200", txHash: hash });
