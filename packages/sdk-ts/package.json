@@ -1,8 +1,31 @@
 {
   "name": "@portal-name/sdk",
-  "version": "0.0.0",
-  "private": true,
-  "description": "TypeScript SDK for the Portal Naming Service (.pot) on Portaldot",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the Portal Naming Service (.pot) — ENS-style names on the Portaldot chain. Resolve names, reverse-resolve addresses, namehash, on any node (devnet, mainnet, or your own RPC).",
+  "license": "MIT",
+  "author": "Romario Kavin",
+  "homepage": "https://github.com/RomarioKavin1/PortalNamingService#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RomarioKavin1/PortalNamingService.git",
+    "directory": "packages/sdk-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/RomarioKavin1/PortalNamingService/issues"
+  },
+  "keywords": [
+    "portaldot",
+    "pns",
+    "naming-service",
+    "ens",
+    "polkadot",
+    "substrate",
+    "ink",
+    "namehash",
+    "web3",
+    "blockchain",
+    "pot"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -12,11 +35,22 @@
       "import": "./dist/index.js"
     }
   },
+  "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build && npm test",
     "test": "vitest run",
     "test:watch": "vitest"
   },

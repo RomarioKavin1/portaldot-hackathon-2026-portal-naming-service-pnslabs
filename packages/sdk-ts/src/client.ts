@@ -39,7 +39,7 @@ export const COIN_POT = 0xffff_0000;
 export class PnsClient {
   private constructor(private conn: PnsConnection) {}
 
-  static async connect(cfg: PnsConfig): Promise<PnsClient> {
+  static async connect(cfg: PnsConfig = {}): Promise<PnsClient> {
     return new PnsClient(await PnsConnection.open(cfg));
   }
 
