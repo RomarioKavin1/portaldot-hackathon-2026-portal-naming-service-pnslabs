@@ -18,6 +18,7 @@ use ink_lang as ink;
 #[ink::contract]
 mod pot_registrar {
     use ink_storage::collections::HashMap as StorageHashMap;
+    use ink_storage::traits::{PackedLayout, SpreadLayout};
     use ink_env::hash::Blake2x256;
     use ink_env::call::{build_call, Call, ExecutionInput, Selector};
     use ink_env::DefaultEnvironment;
@@ -26,7 +27,10 @@ mod pot_registrar {
     pub type Node = [u8; 32];
 
     /// Single name's on-chain registration.
-    #[derive(scale::Encode, scale::Decode, Clone, Copy, Debug, PartialEq, Eq)]
+    #[derive(
+        scale::Encode, scale::Decode, Clone, Copy, Debug, PartialEq, Eq,
+        SpreadLayout, PackedLayout,
+    )]
     #[cfg_attr(
         feature = "std",
         derive(scale_info::TypeInfo, ink_storage::traits::StorageLayout)

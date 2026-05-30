@@ -14,6 +14,7 @@ use ink_lang as ink;
 #[ink::contract]
 mod public_resolver {
     use ink_storage::collections::HashMap as StorageHashMap;
+    use ink_storage::traits::{PackedLayout, SpreadLayout};
     use ink_env::call::{build_call, Call, ExecutionInput, Selector};
     use ink_env::DefaultEnvironment;
     use ink_prelude::{string::String, vec::Vec};
@@ -23,7 +24,10 @@ mod public_resolver {
     // ----- record shapes (spec §4) -----
 
     /// Name-based payment record (spec §6.2).
-    #[derive(scale::Encode, scale::Decode, Clone, Debug, PartialEq, Eq)]
+    #[derive(
+        scale::Encode, scale::Decode, Clone, Debug, PartialEq, Eq,
+        SpreadLayout, PackedLayout,
+    )]
     #[cfg_attr(
         feature = "std",
         derive(scale_info::TypeInfo, ink_storage::traits::StorageLayout)
@@ -35,7 +39,10 @@ mod public_resolver {
     }
 
     /// On-chain identity profile (spec §6.1).
-    #[derive(scale::Encode, scale::Decode, Clone, Debug, PartialEq, Eq)]
+    #[derive(
+        scale::Encode, scale::Decode, Clone, Debug, PartialEq, Eq,
+        SpreadLayout, PackedLayout,
+    )]
     #[cfg_attr(
         feature = "std",
         derive(scale_info::TypeInfo, ink_storage::traits::StorageLayout)

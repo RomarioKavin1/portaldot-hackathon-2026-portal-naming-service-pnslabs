@@ -87,5 +87,6 @@ def deploy(
 if __name__ == "__main__":
     name = sys.argv[1] if len(sys.argv) > 1 else "registry"
     constructor = sys.argv[2] if len(sys.argv) > 2 else "new"
-    salt = bytes.fromhex(sys.argv[3]) if len(sys.argv) > 3 else b"\x00"
+    salt_hex = sys.argv[3] if len(sys.argv) > 3 else "00"
+    salt = bytes.fromhex(salt_hex.removeprefix("0x"))
     deploy(name, constructor=constructor, salt=salt)

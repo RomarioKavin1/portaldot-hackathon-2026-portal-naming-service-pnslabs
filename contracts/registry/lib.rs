@@ -25,6 +25,7 @@ use ink_lang as ink;
 #[ink::contract]
 mod registry {
     use ink_storage::collections::HashMap as StorageHashMap;
+    use ink_storage::traits::{PackedLayout, SpreadLayout};
     use ink_env::hash::Blake2x256;
 
     /// 32-byte node identifier (blake2_256-derived).
@@ -33,7 +34,10 @@ mod registry {
     pub type Label = [u8; 32];
 
     /// What the Registry knows about a node.
-    #[derive(scale::Encode, scale::Decode, Clone, Copy, Debug, PartialEq, Eq)]
+    #[derive(
+        scale::Encode, scale::Decode, Clone, Copy, Debug, PartialEq, Eq,
+        SpreadLayout, PackedLayout,
+    )]
     #[cfg_attr(
         feature = "std",
         derive(scale_info::TypeInfo, ink_storage::traits::StorageLayout)
