@@ -1,4 +1,4 @@
-# @portal-name/sdk
+# portaldot-pns
 
 TypeScript SDK for the **Portal Naming Service** (`.pot`) — ENS-style names on
 the [Portaldot](https://portaldot.io) chain. Resolve names to addresses,
@@ -6,14 +6,14 @@ reverse-resolve addresses to names (forward-verified), and compute namehashes �
 against the devnet, mainnet, or your own node.
 
 ```bash
-npm install @portal-name/sdk
-# or: pnpm add @portal-name/sdk  /  yarn add @portal-name/sdk
+npm install portaldot-pns
+# or: pnpm add portaldot-pns  /  yarn add portaldot-pns
 ```
 
 ## Quick start
 
 ```ts
-import { connect } from "@portal-name/sdk";
+import { connect } from "portaldot-pns";
 
 const pns = await connect();                  // devnet, zero config
 const addr = await pns.resolve("alice.pot");  // → "5Grw…" or null
@@ -31,7 +31,7 @@ Three ways to connect, from zero-config to fully custom:
 ### 1. Bundled preset
 
 ```ts
-import { connect } from "@portal-name/sdk";
+import { connect } from "portaldot-pns";
 
 const pns = await connect({ network: "devnet" }); // default; addresses bundled
 ```

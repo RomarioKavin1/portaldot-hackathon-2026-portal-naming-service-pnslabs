@@ -15,7 +15,7 @@ import type { PnsConfig } from "./connection.js";
  * Portaldot devnet with the bundled deployment when called with no arguments.
  *
  * ```ts
- * import { connect } from "@portal-name/sdk";
+ * import { connect } from "portaldot-pns";
  * const pns = await connect();                       // devnet, zero config
  * const addr = await pns.resolve("alice.pot");
  * await pns.disconnect();

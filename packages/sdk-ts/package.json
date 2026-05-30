@@ -1,5 +1,5 @@
 {
-  "name": "@portal-name/sdk",
+  "name": "portaldot-pns",
   "version": "0.1.0",
   "description": "TypeScript SDK for the Portal Naming Service (.pot) — ENS-style names on the Portaldot chain. Resolve names, reverse-resolve addresses, namehash, on any node (devnet, mainnet, or your own RPC).",
   "license": "MIT",
