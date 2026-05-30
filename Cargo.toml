@@ -1,3 +1,14 @@
 [workspace]
-members = ["contracts/flipper", "contracts/caller"]
+# Each contract carries its own `[workspace]` line so cargo-contract treats
+# it as an independent root. This top-level workspace just collects them for
+# repo-wide LSP discovery / `cargo check --workspace`.
+members = [
+    "contracts/flipper",
+    "contracts/registry",
+    "contracts/pot_registrar",
+    "contracts/registrar_controller",
+    "contracts/public_resolver",
+    "contracts/reverse_registrar",
+    "contracts/subname_registrar",
+]
 resolver = "2"
