@@ -38,14 +38,32 @@ async function submit(
   data: Uint8Array,
 ): Promise<void> {
   const tx = api.tx.contracts.call(dest, value, DEFAULT_GAS, "0x" + Buffer.from(data).toString("hex"));
+
+  // Sign first, then watch ONLY the raw extrinsic status. We deliberately
+  // avoid tx.signAndSend's SubmittableResult, which decodes system.events to
+  // surface dispatchError — this chain ships V13 metadata whose EventRecord
+  // layout @polkadot/api cannot decode (logs "Unable to decode storage
+  // system.events" and the subscription never reports inclusion). The raw
+  // author_submitAndWatchExtrinsic status (ready/inBlock/finalized) needs no
+  // event decoding, so it works here.
+  await tx.signAsync(fromAddress, { signer });
+
   return new Promise((resolve, reject) => {
-    tx.signAndSend(fromAddress, { signer }, ({ status, dispatchError }) => {
-      if (dispatchError) {
-        reject(new Error(String(dispatchError)));
-        return;
-      }
-      if (status.isInBlock || status.isFinalized) resolve();
-    }).catch(reject);
+    let unsub: undefined | (() => void);
+    api.rpc.author
+      .submitAndWatchExtrinsic(tx, (status) => {
+        if (status.isInBlock || status.isFinalized) {
+          unsub?.();
+          resolve();
+        } else if (status.isInvalid || status.isDropped || status.isUsurped) {
+          unsub?.();
+          reject(new Error(`Extrinsic ${status.type}`));
+        }
+      })
+      .then((u) => {
+        unsub = u as unknown as () => void;
+      })
+      .catch(reject);
   });
 }
 
