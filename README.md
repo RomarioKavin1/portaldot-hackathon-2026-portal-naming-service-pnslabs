@@ -4,6 +4,8 @@
 
 **Portal Naming Service (`.pot`)** — Human-readable identity for the Portaldot chain.
 
+[![npm](https://img.shields.io/npm/v/portaldot-pns.svg)](https://www.npmjs.com/package/portaldot-pns) · TypeScript SDK on npm: [`portaldot-pns`](https://www.npmjs.com/package/portaldot-pns)
+
 ## Project Overview
 
 - **Problem Statement:** Portaldot accounts are 48-character SS58 strings (`5Gg7tZDAPRUyoouUzeM1oo3K4migHxH31gcgXUqLS1AoErcZ`). They are impossible to read, type, or verify by eye, which makes payments error-prone and on-chain identity unworkable. Every dApp reinvents its own address book; nothing is portable or composable across the ecosystem.
@@ -126,6 +128,8 @@ The ink! toolchain is pinned (Rust nightly, ink! `3.0.0-rc3`, `cargo-contract` `
 
 #### Using the SDK
 
+The TypeScript SDK is published on npm: **[`portaldot-pns`](https://www.npmjs.com/package/portaldot-pns)**.
+
 ```bash
 npm install portaldot-pns
 ```
@@ -168,8 +172,8 @@ The TypeScript SDK ships network presets and a zero-config `connect()`; pass a c
 
 ### Team
 
-- **Team name:** Portal Naming Service
-- **Members & roles:** Romario Kavin — protocol dApp, Sairam - Contracts
+- **Team name:** pnslabs
+- **Members & roles:** Romario Kavin — protocol, dApp; Sairam — contracts
 - **Contact info:** via the [GitHub repository](https://github.com/RomarioKavin1/PortalNamingService) (hackathon communication only).
 
 ### License
