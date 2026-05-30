@@ -30,7 +30,8 @@ export function NameConsole() {
     setResult({ kind: "searching", name: normalized });
     try {
       const client = await getClient();
-      const addr = await client.resolve(normalized);
+      // The input is a bare label ("romario"); names live under .pot.
+      const addr = await client.resolve(`${normalized}.pot`);
       setResult(
         addr
           ? { kind: "taken", name: normalized, address: addr }
