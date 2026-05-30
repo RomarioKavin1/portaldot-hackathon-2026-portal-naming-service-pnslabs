@@ -3,9 +3,13 @@ target/
 **/target/
 Cargo.lock
 
-# Vendored deps + generated source-replacement config (from toolchain build attempts)
+# Vendored deps from toolchain build attempts
 **/vendor/
-**/.cargo/config.toml
+
+# Generated per-crate source-replacement configs (one-off probes). The
+# project-root .cargo/config.toml IS intentional (frozen-index replacement)
+# and must be tracked.
+contracts/**/.cargo/config.toml
 
 # Node
 node_modules/

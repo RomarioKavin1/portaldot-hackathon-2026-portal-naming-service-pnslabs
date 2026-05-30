@@ -1,0 +1,130 @@
+{
+  "spec_version": 1,
+  "hash_function": "blake2b(32-byte digest)",
+  "labelhash": [
+    {
+      "label": "pot",
+      "hash": "0xd096c0d0638b340fbe66b79bee793ce1b50a84d37b433649d2cd4c44896aea28"
+    },
+    {
+      "label": "alice",
+      "hash": "0xe11d814979372c883b50bdb0ffadb1eaf0898bf54fd4fbf298af126fbabbda4c"
+    },
+    {
+      "label": "bob",
+      "hash": "0x87683da837137691170e1aaa3902a07fe1639cc709f4602b0e1b72f19773f4cd"
+    },
+    {
+      "label": "dao",
+      "hash": "0x4608d7cbeaec9cc05c1a8ac3e80ab284c2bab713d06ecd22345674cd17647040"
+    },
+    {
+      "label": "a",
+      "hash": "0x8928aae63c84d87ea098564d1e03ad813f107add474e56aedd286349c0c03ea4"
+    },
+    {
+      "label": "alice-bob",
+      "hash": "0xe6cfdd63ea462bac536647d7499b98f340cae4d2ef379dfd7bad6049019799fb"
+    },
+    {
+      "label": "test123",
+      "hash": "0x90cccd774db0ac8c6ea2deff0e26fc52768a827c91c737a2e050668d8c39c224"
+    },
+    {
+      "label": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "hash": "0x68fe15b51246fb05aa84b11d8ad165b0c71f34348f386ef879dda156340ef6e9"
+    }
+  ],
+  "namehash": [
+    {
+      "name": "",
+      "node": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "pot",
+      "node": "0x691cb6ed46ed2b4f66d207fd411f7191fba214f305dfc33de89ac03e0d26155d"
+    },
+    {
+      "name": "alice.pot",
+      "node": "0xea961b4305595d4168b2c806343764de613938a27a8dd8e6e94ea84c7cb4db97"
+    },
+    {
+      "name": "bob.pot",
+      "node": "0xaf1cd389ad338ddba60369012fd194e9769ae76b03c969cc21b62202280b52f5"
+    },
+    {
+      "name": "alice.dao.pot",
+      "node": "0xe8ecaed6b61b972b6df0b33c6883163e2cc0745da48e99c721ec95bae760814f"
+    },
+    {
+      "name": "deep.nested.dao.pot",
+      "node": "0xb55c5f42d3838a28268dadf84cbfaceb03df56f86082804a7253d8266daf8359"
+    },
+    {
+      "name": "a.b.c.d.e.f.g.h.pot",
+      "node": "0x50c98094f3d81c7bba2b56cf694d3bb023fc3595331416f0be55ede5ad0925d0"
+    }
+  ],
+  "normalize": [
+    {
+      "name": "ascii lowercase passthrough",
+      "input": "alice",
+      "expected": "alice"
+    },
+    {
+      "name": "lowercase folding",
+      "input": "ALICE",
+      "expected": "alice"
+    },
+    {
+      "name": "lowercase folding mixed",
+      "input": "Alice.POT",
+      "expected": "alice.pot"
+    },
+    {
+      "name": "NFC composes precomposed",
+      "input": "cafe\u0301",
+      "expected": "caf\u00e9"
+    },
+    {
+      "name": "reject zero-width joiner",
+      "input": "ali\u200dce",
+      "expected": null
+    },
+    {
+      "name": "reject zero-width space",
+      "input": "ali\u200bce",
+      "expected": null
+    },
+    {
+      "name": "reject leading dot",
+      "input": ".alice",
+      "expected": null
+    },
+    {
+      "name": "reject trailing dot",
+      "input": "alice.",
+      "expected": null
+    },
+    {
+      "name": "reject empty label (double dot)",
+      "input": "alice..pot",
+      "expected": null
+    },
+    {
+      "name": "reject empty input",
+      "input": "",
+      "expected": null
+    },
+    {
+      "name": "reject ascii control",
+      "input": "alice\u0001",
+      "expected": null
+    },
+    {
+      "name": "reject pure-confusable (cyrillic 'a')",
+      "input": "\u0430lice",
+      "expected": null
+    }
+  ]
+}

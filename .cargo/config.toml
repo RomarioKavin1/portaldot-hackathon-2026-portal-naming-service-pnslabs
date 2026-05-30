@@ -1,0 +1,22 @@
+# Cargo source-replacement: freeze crates.io index to a 2021-05-05 snapshot
+# (rust-lang/crates.io-index-archive @ branch `snapshot-2021-05-05`,
+# tip commit a5dcd8438da2d8f99e3661a1956afbfb8f026fa0 on 2021-05-05 19:36 UTC).
+#
+# Why: cargo-contract 0.12.1's `-Zbuild-std` re-resolves the full dep graph
+# against the active registry, bypassing Cargo.lock pinning. With today's
+# crates.io that pulls edition2021 crates rustc 1.52 (nightly-2021-03-01)
+# can't parse. Replacing the registry with a 2021-05 snapshot caps every
+# caret resolution at versions that existed on that date.
+#
+# Crate tarballs are still downloaded from crates.io itself
+# (config.json `dl = https://crates.io/api/v1/crates`); only the index lookup
+# is frozen.
+#
+# Container bind-mounts the host index at /mirror/crates.io-index, so the
+# config below uses the in-container path.
+
+[source.crates-io]
+replace-with = "frozen-index"
+
+[source.frozen-index]
+registry = "file:///mirror/crates.io-index"
